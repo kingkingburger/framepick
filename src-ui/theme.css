@@ -1,0 +1,153 @@
+/* ================================================================
+ * FramePick – Shared Dark Theme
+ * ================================================================
+ * Single source of truth for all theme tokens.
+ *
+ * Used by:
+ *   1. Tauri app UI  – loaded via <link> in index.html
+ *   2. slides.html   – embedded inline via theme::css_variables_block()
+ *                      in src/theme.rs (keep both files in sync!)
+ *
+ * Naming convention: --fp-<category>-<name>
+ *   bg-*      Background colors
+ *   text-*    Text / foreground colors
+ *   accent-*  Brand accent palette
+ *   border-*  Border colors
+ *   shadow-*  Box shadows
+ *   radius-*  Border radii
+ *   font-*    Font stacks
+ *   spacing-* Spacing scale
+ *   success-* Success state
+ *   error-*   Error state
+ *   warning-* Warning state
+ * ================================================================ */
+
+:root {
+  /* ── Backgrounds ───────────────────────────────────────────── */
+  --fp-bg-primary: #1a1a2e;
+  --fp-bg-secondary: #16213e;
+  --fp-bg-card: #1e293b;
+  --fp-bg-input: #0f172a;
+  --fp-bg-hover: #2d3a50;
+  --fp-bg-active: #334155;
+  --fp-bg-surface: #0f3460;
+  --fp-bg-overlay: rgba(0, 0, 0, 0.78);
+  --fp-bg-overlay-light: rgba(0, 0, 0, 0.6);
+  --fp-bg-image: #000;
+  --fp-bg-deep: #111;
+  --fp-bg-deepest: #0f0f0f;
+  --fp-bg-scrollbar-track: transparent;
+  --fp-bg-scrollbar-thumb: #333;
+  --fp-bg-scrollbar-thumb-hover: #555;
+
+  /* ── Text Colors ───────────────────────────────────────────── */
+  --fp-text-primary: #e2e8f0;
+  --fp-text-secondary: #94a3b8;
+  --fp-text-muted: #64748b;
+  --fp-text-heading: #ffffff;
+  --fp-text-body: #d4d4d4;
+  --fp-text-hint: #7a7a94;
+  --fp-text-meta: #888;
+  --fp-text-footer: #444;
+  --fp-text-on-accent: #fff;
+
+  /* ── Accent Palette ────────────────────────────────────────── */
+  --fp-accent: #3b82f6;
+  --fp-accent-hover: #2563eb;
+  --fp-accent-light: #60a5fa;
+  --fp-accent-dim: rgba(59, 130, 246, 0.15);
+  --fp-accent-subtle: rgba(59, 130, 246, 0.12);
+  --fp-accent-glow: rgba(59, 130, 246, 0.15);
+  --fp-accent-bg: rgba(59, 130, 246, 0.08);
+  --fp-accent-bg-faint: rgba(59, 130, 246, 0.05);
+  --fp-accent-bg-light: rgba(59, 130, 246, 0.1);
+  --fp-accent-focus-ring: rgba(59, 130, 246, 0.15);
+  --fp-accent-focus-ring-strong: rgba(59, 130, 246, 0.25);
+  --fp-accent-shadow: rgba(59, 130, 246, 0.3);
+  --fp-accent-border: rgba(59, 130, 246, 0.6);
+  --fp-accent-solid: rgba(59, 130, 246, 0.85);
+
+  /* ── Borders ───────────────────────────────────────────────── */
+  --fp-border: #334155;
+  --fp-border-focus: #3b82f6;
+  --fp-border-subtle: #1e293b;
+  --fp-border-translucent: rgba(51, 65, 85, 0.4);
+  --fp-border-solid-bg: rgba(51, 65, 85, 0.85);
+  --fp-border-solid-bg-full: rgba(51, 65, 85, 1);
+
+  /* ── Shadows ───────────────────────────────────────────────── */
+  --fp-shadow: rgba(0, 0, 0, 0.3);
+  --fp-shadow-deep: rgba(0, 0, 0, 0.4);
+  --fp-shadow-card: 0 2px 12px rgba(0, 0, 0, 0.5);
+  --fp-shadow-card-hover: 0 4px 24px rgba(59, 130, 246, 0.12);
+  --fp-shadow-toggle: 0 2px 12px rgba(59, 130, 246, 0.4);
+  --fp-shadow-footer: rgba(0, 0, 0, 0.1);
+
+  /* ── Border Radii ──────────────────────────────────────────── */
+  --fp-radius: 8px;
+  --fp-radius-sm: 4px;
+  --fp-radius-lg: 12px;
+
+  /* ── Typography ────────────────────────────────────────────── */
+  --fp-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
+  --fp-font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  --fp-font-size-xs: 0.7rem;
+  --fp-font-size-sm: 0.78rem;
+  --fp-font-size-base: 0.95rem;
+  --fp-font-size-lg: 1rem;
+
+  /* ── Transitions ───────────────────────────────────────────── */
+  --fp-transition: 0.2s ease;
+  --fp-transition-fast: 0.18s ease;
+
+  /* ── Spacing Scale ─────────────────────────────────────────── */
+  --fp-spacing-xs: 4px;
+  --fp-spacing-sm: 8px;
+  --fp-spacing-md: 16px;
+  --fp-spacing-lg: 24px;
+  --fp-spacing-xl: 48px;
+
+  /* ── Status: Success ───────────────────────────────────────── */
+  --fp-success: #22c55e;
+  --fp-success-light: #4ade80;
+  --fp-success-bg: rgba(34, 197, 94, 0.12);
+
+  /* ── Status: Error ─────────────────────────────────────────── */
+  --fp-error: #ef4444;
+  --fp-error-light: #f87171;
+  --fp-error-bg: rgba(239, 68, 68, 0.12);
+  --fp-error-border: rgba(239, 68, 68, 0.3);
+
+  /* ── Status: Warning ───────────────────────────────────────── */
+  --fp-warning: #f59e0b;
+  --fp-warning-bg: rgba(245, 158, 11, 0.12);
+  --fp-warning-border: rgba(245, 158, 11, 0.3);
+
+  /* ── Misc ──────────────────────────────────────────────────── */
+  --fp-overlay: rgba(0, 0, 0, 0.6);
+  --fp-overlay-heavy: rgba(0, 0, 0, 0.78);
+  --fp-overlay-light: rgba(0, 0, 0, 0.75);
+  --fp-neutral-tint: rgba(148, 163, 184, 0.15);
+  --fp-neutral-tint-light: rgba(148, 163, 184, 0.12);
+  --fp-neutral-tint-border: rgba(148, 163, 184, 0.3);
+  --fp-info-bg: rgba(106, 153, 255, 0.15);
+  --fp-select-arrow: #94a3b8;
+
+  /* ── Short Aliases (backward compat with styles.css) ─────── */
+  --bg-primary: var(--fp-bg-primary);
+  --bg-secondary: var(--fp-bg-secondary);
+  --bg-card: var(--fp-bg-card);
+  --bg-input: var(--fp-bg-input);
+  --bg-hover: var(--fp-bg-hover);
+  --text-primary: var(--fp-text-primary);
+  --text-secondary: var(--fp-text-secondary);
+  --text-muted: var(--fp-text-muted);
+  --accent: var(--fp-accent);
+  --accent-hover: var(--fp-accent-hover);
+  --accent-dim: var(--fp-accent-dim);
+  --error: var(--fp-error);
+  --success: var(--fp-success);
+  --border: var(--fp-border);
+  --radius: var(--fp-radius);
+  --radius-sm: var(--fp-radius-sm);
+}

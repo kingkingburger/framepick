@@ -811,8 +811,15 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="library-card-meta">${escapeHtml(slideInfo)}</div>
           </div>
           <div class="library-card-actions">
-            <button class="btn-icon btn-open-folder" data-video-id="${escapeAttr(entry.video_id)}" title="${I18n.t('openFolder')}">
+            ${entry.has_slides ? `<button class="btn-library-action btn-open-viewer" data-video-id="${escapeAttr(entry.video_id)}" title="${I18n.t('libraryOpenViewer')}">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 3C4.5 3 1.6 5.1.3 8c1.3 2.9 4.2 5 7.7 5s6.4-2.1 7.7-5c-1.3-2.9-4.2-5-7.7-5zm0 8.3a3.3 3.3 0 1 1 0-6.6 3.3 3.3 0 0 1 0 6.6zM8 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg>
+              <span>${I18n.t('libraryOpenViewer')}</span>
+            </button>` : ''}
+            <button class="btn-library-action btn-open-folder" data-video-id="${escapeAttr(entry.video_id)}" title="${I18n.t('libraryOpenFolder')}">
               <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h3.879a1.5 1.5 0 0 1 1.06.44l1.122 1.12A1.5 1.5 0 0 0 9.62 4H13.5A1.5 1.5 0 0 1 15 5.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 12.5v-9z"/></svg>
+            </button>
+            <button class="btn-library-action btn-delete-item" data-video-id="${escapeAttr(entry.video_id)}" title="${I18n.t('libraryDelete')}">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4L4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
             </button>
           </div>
         </div>`;
@@ -829,6 +836,33 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
     });
+
+    // Attach click handlers for "Open Viewer" buttons
+    libraryGrid.querySelectorAll('.btn-open-viewer').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevent card click
+        const videoId = btn.dataset.videoId;
+        if (videoId) handleOpenSlides(videoId);
+      });
+    });
+
+    // Attach click handlers for "Open Folder" buttons
+    libraryGrid.querySelectorAll('.btn-open-folder').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevent card click
+        const videoId = btn.dataset.videoId;
+        if (videoId) handleOpenFolder(videoId);
+      });
+    });
+
+    // Attach click handlers for "Delete" buttons
+    libraryGrid.querySelectorAll('.btn-delete-item').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevent card click
+        const videoId = btn.dataset.videoId;
+        if (videoId) handleDeleteLibraryItem(videoId);
+      });
+    });
   }
 
   /** Open slides for a video in external browser. */
@@ -837,6 +871,32 @@ document.addEventListener('DOMContentLoaded', () => {
       await invoke('open_slides_external', { videoId });
     } catch (e) {
       console.warn('[library] Failed to open slides for', videoId, e);
+    }
+  }
+
+  /** Open a library item's output directory in the system file explorer. */
+  async function handleOpenFolder(videoId) {
+    try {
+      await invoke('open_folder', { videoId });
+    } catch (e) {
+      console.warn('[library] Failed to open folder for', videoId, e);
+    }
+  }
+
+  /** Delete a library item after user confirmation. */
+  async function handleDeleteLibraryItem(videoId) {
+    // Show confirmation dialog
+    const confirmed = window.confirm(I18n.t('libraryDeleteConfirm'));
+    if (!confirmed) return;
+
+    try {
+      await invoke('delete_library_entry', { videoId });
+      showAppToast(I18n.t('libraryDeleteSuccess'), 'success');
+      // Refresh library to reflect deletion
+      await loadLibrary();
+    } catch (e) {
+      console.warn('[library] Failed to delete', videoId, e);
+      showAppToast(`${I18n.t('libraryDeleteError')}: ${e}`, 'error', 5000);
     }
   }
 

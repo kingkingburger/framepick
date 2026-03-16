@@ -298,23 +298,24 @@ pub fn render_slides_html(
 /* === Shared Theme (embedded from framepick theme.rs) === */
 {theme_css}
 
-/* Legacy aliases for backward compatibility */
+/* Short aliases (match src-ui/theme.css alias layer) */
 :root{{
-  --bg-primary: var(--fp-bg-body);
-  --bg-secondary: var(--fp-bg-sidebar);
-  --bg-surface: var(--fp-bg-surface);
+  --bg-primary: var(--fp-bg-primary);
+  --bg-secondary: var(--fp-bg-secondary);
+  --bg-card: var(--fp-bg-card);
   --bg-input: var(--fp-bg-input);
+  --bg-hover: var(--fp-bg-hover);
   --text-primary: var(--fp-text-primary);
   --text-secondary: var(--fp-text-secondary);
-  --text-hint: var(--fp-text-hint);
+  --text-muted: var(--fp-text-muted);
   --accent: var(--fp-accent);
   --accent-hover: var(--fp-accent-hover);
+  --accent-dim: var(--fp-accent-dim);
+  --error: var(--fp-error);
+  --success: var(--fp-success);
   --border: var(--fp-border);
-  --border-focus: var(--fp-border-focus);
-  --shadow: var(--fp-shadow);
   --radius: var(--fp-radius);
   --radius-sm: var(--fp-radius-sm);
-  --transition: var(--fp-transition);
 }}
 
 /* === Reset & Base === */
@@ -322,7 +323,7 @@ pub fn render_slides_html(
 html{{ scroll-behavior:smooth; height:100%; }}
 body{{
   font-family: var(--fp-font-family);
-  background: var(--fp-bg-body);
+  background: var(--fp-bg-primary);
   color: var(--fp-text-primary);
   overflow: hidden;
   height: 100vh;
@@ -340,7 +341,7 @@ body{{
 .sidebar{{
   width: 300px;
   min-width: 260px;
-  background: var(--fp-bg-sidebar);
+  background: var(--fp-bg-secondary);
   border-right: 1px solid var(--fp-border);
   display: flex;
   flex-direction: column;
@@ -438,7 +439,7 @@ body{{
   padding: 0;
 }}
 .main-content::-webkit-scrollbar{{ width:8px; }}
-.main-content::-webkit-scrollbar-track{{ background: var(--fp-bg-body); }}
+.main-content::-webkit-scrollbar-track{{ background: var(--fp-bg-primary); }}
 .main-content::-webkit-scrollbar-thumb{{ background: var(--fp-bg-scrollbar-thumb); border-radius: var(--fp-radius-sm); }}
 .main-content::-webkit-scrollbar-thumb:hover{{ background: var(--fp-bg-scrollbar-thumb-hover); }}
 
@@ -450,7 +451,7 @@ body{{
 
 /* --- Slide card --- */
 .slide{{
-  background: var(--fp-bg-sidebar);
+  background: var(--fp-bg-secondary);
   border-radius: var(--fp-radius-lg);
   margin-bottom: 20px;
   overflow: hidden;
@@ -500,7 +501,7 @@ body{{
   top: 10px;
   right: 10px;
   background: var(--fp-bg-overlay-light);
-  color: var(--fp-text-hint);
+  color: var(--fp-text-muted);
   padding: 3px var(--fp-spacing-sm);
   border-radius: var(--fp-radius-sm);
   font-size: var(--fp-font-size-xs);
@@ -525,7 +526,7 @@ body{{
 /* --- Footer --- */
 .footer{{
   text-align: center;
-  color: var(--fp-text-hint);
+  color: var(--fp-text-muted);
   padding: var(--fp-spacing-md);
   font-size: var(--fp-font-size-sm);
   border-top: 1px solid var(--fp-border);
@@ -557,7 +558,7 @@ body{{
   position: fixed;
   bottom: 12px;
   right: 16px;
-  color: var(--fp-text-hint);
+  color: var(--fp-text-muted);
   font-size: var(--fp-font-size-xs);
   font-family: var(--fp-font-mono);
   pointer-events: none;
@@ -1156,8 +1157,8 @@ mod tests {
     fn dark_theme_css_properties() {
         let html = render_slides_html(&sample_segments(), &sample_metadata()).unwrap();
         // Verify shared --fp-* theme CSS custom properties are embedded
-        assert!(html.contains("--fp-bg-body:"), "Missing --fp-bg-body");
-        assert!(html.contains("--fp-bg-sidebar:"), "Missing --fp-bg-sidebar");
+        assert!(html.contains("--fp-bg-primary:"), "Missing --fp-bg-primary");
+        assert!(html.contains("--fp-bg-secondary:"), "Missing --fp-bg-secondary");
         assert!(html.contains("--fp-bg-surface:"), "Missing --fp-bg-surface");
         assert!(html.contains("--fp-text-primary:"), "Missing --fp-text-primary");
         assert!(html.contains("--fp-text-secondary:"), "Missing --fp-text-secondary");
@@ -1172,11 +1173,11 @@ mod tests {
         assert!(html.contains("--fp-bg-image:"), "Missing --fp-bg-image");
         assert!(html.contains("--fp-text-on-accent:"), "Missing --fp-text-on-accent");
         // Verify legacy aliases map to --fp-* tokens
-        assert!(html.contains("--bg-primary: var(--fp-bg-body)"));
+        assert!(html.contains("--bg-primary: var(--fp-bg-primary)"));
         assert!(html.contains("--accent: var(--fp-accent)"));
         // Verify theme variables are used directly in key elements (--fp-* tokens)
-        assert!(html.contains("background: var(--fp-bg-body)"));     // body
-        assert!(html.contains("background: var(--fp-bg-sidebar)")); // sidebar + cards
+        assert!(html.contains("background: var(--fp-bg-primary)"));     // body
+        assert!(html.contains("background: var(--fp-bg-secondary)")); // sidebar + cards
         assert!(html.contains("color: var(--fp-text-primary)"));    // body text
         assert!(html.contains("color: var(--fp-accent)"));          // accent elements
         assert!(html.contains("background: var(--fp-bg-image)"));   // slide image bg

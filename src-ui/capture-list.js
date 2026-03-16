@@ -13,7 +13,7 @@ const CaptureListComponent = (() => {
 
   // DOM references (set on init)
   let captureSection, captureListEl, captureMeta, captureMetaTitle, captureMetaCount;
-  let btnCaptureBack, btnViewGrid, btnViewList, btnOpenSlides;
+  let btnCaptureBack, btnViewGrid, btnViewList, btnOpenSlides, btnOpenFolder;
   let frameLightbox, lightboxBackdrop, lightboxCloseBtn, lightboxPrev, lightboxNext;
   let lightboxImage, lightboxIndex, lightboxTimestamp, lightboxText;
 
@@ -41,6 +41,7 @@ const CaptureListComponent = (() => {
     btnViewGrid        = document.getElementById('btn-view-grid');
     btnViewList        = document.getElementById('btn-view-list');
     btnOpenSlides      = document.getElementById('btn-open-slides');
+    btnOpenFolder      = document.getElementById('btn-open-folder');
     frameLightbox      = document.getElementById('frame-lightbox');
     lightboxBackdrop   = document.getElementById('lightbox-backdrop');
     lightboxCloseBtn   = document.getElementById('lightbox-close');
@@ -105,6 +106,16 @@ const CaptureListComponent = (() => {
         if (data && data.videoId) _handleOpenSlides(data.videoId);
       });
     }
+
+    // Open folder button
+    if (btnOpenFolder) {
+      btnOpenFolder.addEventListener('click', function () {
+        var data = AppState.get('captureFrames');
+        if (data && data.videoId) {
+          _invoke('open_folder', { videoId: data.videoId });
+        }
+      });
+    }
   }
 
   /**
@@ -117,6 +128,7 @@ const CaptureListComponent = (() => {
     captureListEl.innerHTML = '<p class="capture-empty">' + I18n.t('captureLoading') + '</p>';
     if (captureMeta) captureMeta.hidden = true;
     if (btnOpenSlides) btnOpenSlides.hidden = true;
+    if (btnOpenFolder) btnOpenFolder.hidden = true;
 
     try {
       var result = await _invoke('get_capture_frames', { videoId: videoId });
@@ -147,6 +159,7 @@ const CaptureListComponent = (() => {
       captureListEl.innerHTML = '<p class="capture-empty">' + I18n.t('captureEmpty') + '</p>';
       if (captureMeta) captureMeta.hidden = true;
       if (btnOpenSlides) btnOpenSlides.hidden = true;
+      if (btnOpenFolder) btnOpenFolder.hidden = true;
       return;
     }
 
@@ -163,6 +176,7 @@ const CaptureListComponent = (() => {
     }
 
     if (btnOpenSlides && data.videoId) btnOpenSlides.hidden = false;
+    if (btnOpenFolder && data.videoId) btnOpenFolder.hidden = false;
 
     var viewMode = AppState.get('captureViewMode');
     var frames = data.frames;

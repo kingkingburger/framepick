@@ -1,22 +1,8 @@
-/* FramePick - Dark Theme */
-:root {
-  --bg-primary: #1a1a2e;
-  --bg-secondary: #16213e;
-  --bg-card: #1e293b;
-  --bg-input: #0f172a;
-  --bg-hover: #2d3a50;
-  --text-primary: #e2e8f0;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --accent: #3b82f6;
-  --accent-hover: #2563eb;
-  --accent-dim: rgba(59, 130, 246, 0.15);
-  --error: #ef4444;
-  --success: #22c55e;
-  --border: #334155;
-  --radius: 8px;
-  --radius-sm: 4px;
-}
+/* FramePick - Component Styles
+ * Theme variables are defined in theme.css (imported via index.html).
+ * This file uses short aliases mapped to --fp-* canonical theme tokens. */
+
+/* Aliases are defined in theme.css – no duplicate :root needed here. */
 
 * {
   margin: 0;
@@ -25,7 +11,7 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--fp-font-family);
   background: var(--bg-primary);
   color: var(--text-primary);
   min-height: 100vh;
@@ -238,7 +224,7 @@ body {
 .capture-frame-card:hover {
   border-color: var(--accent);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-card-hover);
 }
 
 .capture-frame-thumb {
@@ -283,7 +269,7 @@ body {
   position: absolute;
   top: 4px;
   left: 4px;
-  background: rgba(59, 130, 246, 0.85);
+  background: var(--fp-accent-solid);
   color: white;
   font-size: 0.6rem;
   padding: 1px 5px;
@@ -398,7 +384,7 @@ body {
 .lightbox-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.85);
+  background: var(--fp-overlay-heavy);
   backdrop-filter: blur(4px);
 }
 
@@ -836,13 +822,13 @@ body {
 .status-completed,
 .status-done {
   color: var(--success);
-  background: rgba(34, 197, 94, 0.15);
+  background: var(--fp-success-bg-strong);
 }
 
 .status-failed,
 .status-error {
   color: var(--error);
-  background: rgba(239, 68, 68, 0.15);
+  background: var(--fp-error-bg-strong);
 }
 
 .status-skipped {
@@ -941,7 +927,7 @@ body {
   margin-top: 6px;
   font-size: 0.75rem;
   color: var(--error);
-  background: rgba(239, 68, 68, 0.08);
+  background: var(--fp-error-bg);
   padding: 4px 8px;
   border-radius: var(--radius-sm);
   overflow: hidden;
@@ -1129,7 +1115,7 @@ body {
 .btn-remove:hover {
   color: var(--error);
   border-color: var(--error);
-  background: rgba(239, 68, 68, 0.1);
+  background: var(--fp-error-bg);
 }
 
 .btn-retry:hover {
@@ -1141,14 +1127,14 @@ body {
 .btn-view-slides:hover {
   color: var(--success);
   border-color: var(--success);
-  background: rgba(34, 197, 94, 0.1);
+  background: var(--fp-success-bg);
 }
 
 /* ─── Playlist Dialog ─────────────────────────────────────── */
 .dialog-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--fp-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1413,7 +1399,7 @@ body {
 .library-card:hover {
   border-color: var(--accent);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-card-hover);
 }
 
 .library-card-thumb {
@@ -1475,6 +1461,54 @@ body {
   color: var(--text-muted);
 }
 
+.library-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px 8px;
+}
+
+.btn-library-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.btn-library-action:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.btn-library-action.btn-open-viewer {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn-library-action.btn-open-viewer:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+.btn-library-action svg {
+  flex-shrink: 0;
+}
+
+.btn-library-action.btn-delete-item:hover {
+  color: var(--error);
+  border-color: var(--error);
+  background: rgba(239, 68, 68, 0.1);
+}
+
 /* Loading spinner for library */
 .library-loading {
   grid-column: 1 / -1;
@@ -1506,7 +1540,7 @@ body {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--fp-overlay);
   display: flex;
   align-items: center;
   justify-content: center;

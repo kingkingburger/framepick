@@ -80,6 +80,8 @@ const I18n = (() => {
       librarySlides: '슬라이드',
       libraryNoSlides: '슬라이드 없음',
       libraryRefresh: '새로고침',
+      libraryOpenViewer: '뷰어 열기',
+      libraryOpenFolder: '폴더 열기',
       // Settings
       settingsTitle: '설정',
       settingsBtn: '설정',
@@ -129,6 +131,11 @@ const I18n = (() => {
       captureFrameOf: '/',
       captureLoading: '프레임을 불러오는 중...',
       openFolder: '폴더 열기',
+      // Library delete
+      libraryDelete: '삭제',
+      libraryDeleteConfirm: '이 항목을 삭제하시겠습니까? 모든 캡쳐 이미지와 슬라이드가 영구적으로 삭제됩니다.',
+      libraryDeleteSuccess: '라이브러리 항목이 삭제되었습니다',
+      libraryDeleteError: '삭제 실패',
     },
     en: {
       urlLabel: 'YouTube URL',
@@ -203,6 +210,8 @@ const I18n = (() => {
       librarySlides: 'slides',
       libraryNoSlides: 'No slides',
       libraryRefresh: 'Refresh',
+      libraryOpenViewer: 'Open Viewer',
+      libraryOpenFolder: 'Open Folder',
       // Settings
       settingsTitle: 'Settings',
       settingsBtn: 'Settings',
@@ -252,6 +261,11 @@ const I18n = (() => {
       captureFrameOf: '/',
       captureLoading: 'Loading frames...',
       openFolder: 'Open Folder',
+      // Library delete
+      libraryDelete: 'Delete',
+      libraryDeleteConfirm: 'Delete this item? All captured images and slides will be permanently removed.',
+      libraryDeleteSuccess: 'Library item deleted',
+      libraryDeleteError: 'Failed to delete',
     },
   };
 
