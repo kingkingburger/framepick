@@ -273,32 +273,9 @@ async fn process_single_item(
         }
     }
 
-    // ─── Resolve effective capture mode (subtitle fallback logic) ──────
-    let url_for_resolve = safe_url.clone();
-    let mode_for_resolve = item.capture_mode.clone();
-
-    let resolved = tauri::async_runtime::spawn_blocking(move || {
-        crate::capture_fallback::resolve_capture_mode(&url_for_resolve, &mode_for_resolve)
-    })
-    .await
-    .map_err(|e| format!("Capture mode resolution failed: {e}"))?;
-
-    let effective_mode = resolved.effective_mode.clone();
-
-    // If a fallback occurred, notify the frontend
-    if resolved.did_fallback {
-        println!(
-            "[queue_processor] Item {}: Capture mode fallback {} -> {} ({})",
-            item.id, resolved.requested_mode, resolved.effective_mode, resolved.fallback_reason
-        );
-        crate::capture_fallback::emit_fallback_event(app, item.id, &item.url, &resolved);
-
-        // Update the queue item's capture mode to reflect the effective mode
-        update_item_capture_mode(app, item.id, &effective_mode);
-    }
-
-    // Create a progress tracker using the effective (possibly changed) mode
-    let mut tracker = ProgressTracker::new(item.id, &effective_mode);
+    // Capture mode will be resolved after download (when we know if subtitles exist)
+    let requested_mode = item.capture_mode.clone();
+    let mut tracker = ProgressTracker::new(item.id, &requested_mode);
 
     // ─── Stage: Fetch metadata ────────────────────────────────────
     tracker.emit(app, 0, Some("Fetching video metadata...".to_string()));
@@ -352,6 +329,26 @@ async fn process_single_item(
 
     tracker.emit(app, 100, Some("Download complete".to_string()));
     tracker.complete_stage(app);
+
+    // ─── Resolve effective capture mode based on downloaded subtitle file ──
+    let effective_mode = if requested_mode == "subtitle" {
+        if download_result.subtitle_path.is_some() {
+            println!("[queue_processor] Item {}: Subtitle file found, using subtitle mode", item.id);
+            "subtitle".to_string()
+        } else {
+            println!("[queue_processor] Item {}: No subtitle file downloaded, falling back to scene mode", item.id);
+            let _ = app.emit("capture:fallback", serde_json::json!({
+                "queue_id": item.id,
+                "requested_mode": "subtitle",
+                "effective_mode": "scene",
+                "reason": "No subtitles available — using scene change detection",
+            }));
+            update_item_capture_mode(app, item.id, "scene");
+            "scene".to_string()
+        }
+    } else {
+        requested_mode.clone()
+    };
 
     // ─── Stage: Capture frames ────────────────────────────────────
     tracker.emit(app, 0, Some(format!("Capturing frames (mode: {effective_mode})...")));
