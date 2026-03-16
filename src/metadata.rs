@@ -43,30 +43,12 @@ struct YtDlpJson {
 
 /// Resolve the path to the yt-dlp executable.
 ///
-/// Looks for `yt-dlp.exe` (Windows) or `yt-dlp` next to the running executable
-/// for portable distribution. Falls back to the system PATH.
+/// Search order:
+/// 1. `tools/yt-dlp.exe` next to the executable (managed by tools_manager).
+/// 2. `yt-dlp.exe` directly next to the executable (portable/legacy).
+/// 3. System PATH fallback.
 pub fn resolve_ytdlp_path() -> PathBuf {
-    // First try next to the executable (portable mode)
-    if let Ok(exe_path) = std::env::current_exe() {
-        if let Some(exe_dir) = exe_path.parent() {
-            let ytdlp_name = if cfg!(windows) {
-                "yt-dlp.exe"
-            } else {
-                "yt-dlp"
-            };
-            let portable_path = exe_dir.join(ytdlp_name);
-            if portable_path.exists() {
-                return portable_path;
-            }
-        }
-    }
-
-    // Fall back to PATH
-    PathBuf::from(if cfg!(windows) {
-        "yt-dlp.exe"
-    } else {
-        "yt-dlp"
-    })
+    crate::tools_manager::resolve_ytdlp_path()
 }
 
 /// Fetch metadata for a YouTube video URL using yt-dlp.

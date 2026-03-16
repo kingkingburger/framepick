@@ -102,40 +102,21 @@ impl From<std::io::Error> for CaptureError {
 /// Resolve the path to the ffmpeg binary.
 ///
 /// Search order:
-/// 1. `ffmpeg.exe` / `ffmpeg` next to the running executable (portable mode).
-/// 2. System PATH (fallback).
+/// 1. `tools/ffmpeg.exe` next to the executable (managed by tools_manager).
+/// 2. `ffmpeg.exe` directly next to the executable (portable/legacy).
+/// 3. System PATH (fallback).
 pub fn resolve_ffmpeg_path() -> PathBuf {
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            let candidate = if cfg!(windows) {
-                dir.join("ffmpeg.exe")
-            } else {
-                dir.join("ffmpeg")
-            };
-            if candidate.exists() {
-                return candidate;
-            }
-        }
-    }
-    // Fallback: rely on system PATH
-    PathBuf::from("ffmpeg")
+    crate::tools_manager::resolve_ffmpeg_path()
 }
 
 /// Resolve the path to ffprobe (for duration queries).
+///
+/// Search order:
+/// 1. `tools/ffprobe.exe` next to the executable (managed by tools_manager).
+/// 2. `ffprobe.exe` directly next to the executable (portable/legacy).
+/// 3. System PATH (fallback).
 pub fn resolve_ffprobe_path() -> PathBuf {
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            let candidate = if cfg!(windows) {
-                dir.join("ffprobe.exe")
-            } else {
-                dir.join("ffprobe")
-            };
-            if candidate.exists() {
-                return candidate;
-            }
-        }
-    }
-    PathBuf::from("ffprobe")
+    crate::tools_manager::resolve_ffprobe_path()
 }
 
 /// Format seconds into "HH:MM:SS" display string.

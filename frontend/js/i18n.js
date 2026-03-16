@@ -180,6 +180,15 @@ const I18N = {
     'capture_list_empty': '캡쳐된 프레임이 없습니다',
     // Workflow hint
     'workflow_hint': 'YouTube URL을 입력하고 시작 버튼을 누르면 프레임 캡쳐가 시작됩니다',
+    // Tools setup overlay
+    'tools_setup_title': '도구 설치 중...',
+    'tools_setup_message': '필요한 도구를 다운로드하는 중입니다',
+    'tools_setup_checking': '확인 중...',
+    'tools_setup_downloading': '다운로드 중... {pct}%',
+    'tools_setup_extracting': '압축 해제 중...',
+    'tools_setup_ready': '준비 완료',
+    'tools_setup_error': '도구 설치 실패: {error}',
+    'tools_update_available': 'yt-dlp 업데이트 사용 가능 ({latest})',
   },
   en: {
     // Capture mode
@@ -358,6 +367,15 @@ const I18N = {
     'capture_list_empty': 'No frames captured',
     // Workflow hint
     'workflow_hint': 'Enter a YouTube URL and click Start to begin frame capture',
+    // Tools setup overlay
+    'tools_setup_title': 'Installing tools...',
+    'tools_setup_message': 'Downloading required tools',
+    'tools_setup_checking': 'Checking...',
+    'tools_setup_downloading': 'Downloading... {pct}%',
+    'tools_setup_extracting': 'Extracting...',
+    'tools_setup_ready': 'Ready',
+    'tools_setup_error': 'Tool installation failed: {error}',
+    'tools_update_available': 'yt-dlp update available ({latest})',
   }
 };
 

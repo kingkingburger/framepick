@@ -1,5 +1,6 @@
 pub mod capture;
 pub mod cmd_util;
+pub mod tools_manager;
 pub mod capture_fallback;
 pub mod cleanup;
 pub mod config;
@@ -80,6 +81,10 @@ pub fn run() {
             // Playlist detection & fetching
             playlist::detect_playlist_url,
             playlist::fetch_playlist,
+            // Tools manager (auto-download yt-dlp + ffmpeg)
+            tools_manager::setup_tools,
+            tools_manager::check_ytdlp_update,
+            tools_manager::update_ytdlp,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -12,6 +12,79 @@ document.addEventListener('DOMContentLoaded', () => {
     return Promise.resolve(null);
   };
 
+  // ─── Tools setup (auto-download yt-dlp + ffmpeg) ───────────
+  const toolsOverlay = document.getElementById('tools-setup-overlay');
+  const toolsMessage = document.getElementById('tools-setup-message');
+  const toolsProgressFill = document.getElementById('tools-progress-fill');
+  const toolsDetail = document.getElementById('tools-setup-detail');
+
+  function updateToolsOverlay(pct, message, detail) {
+    if (toolsProgressFill) toolsProgressFill.style.width = pct + '%';
+    if (toolsMessage) toolsMessage.textContent = message;
+    if (toolsDetail) toolsDetail.textContent = detail || '';
+  }
+
+  async function runToolsSetup() {
+    if (!window.__TAURI__ || !window.__TAURI__.core) return;
+
+    // Listen to granular progress events from the backend
+    let unlistenFn = null;
+    if (window.__TAURI__.event && window.__TAURI__.event.listen) {
+      unlistenFn = await window.__TAURI__.event.listen('tools:status', (event) => {
+        const p = event.payload;
+        if (!p) return;
+
+        // Map tool+status → progress percentage
+        let pct = p.progress != null ? p.progress : 0;
+        // yt-dlp occupies 0–50%, ffmpeg 50–100%
+        if (p.tool === 'yt-dlp') {
+          pct = Math.round(pct / 2);
+        } else if (p.tool === 'ffmpeg') {
+          pct = 50 + Math.round(pct / 2);
+        }
+
+        const statusLabel = p.status === 'downloading' ? t('tools_setup_downloading', { pct: p.progress })
+          : p.status === 'extracting' ? t('tools_setup_extracting')
+          : p.status === 'ready' ? t('tools_setup_ready')
+          : t('tools_setup_checking');
+
+        updateToolsOverlay(pct, t('tools_setup_message'), `${p.tool}: ${statusLabel}`);
+      });
+    }
+
+    try {
+      // Check whether any downloads are needed before showing overlay
+      // We do this by calling setup_tools; if all ready it returns quickly
+      // Show overlay immediately — hide once done
+      if (toolsOverlay) toolsOverlay.hidden = false;
+      updateToolsOverlay(0, t('tools_setup_message'), t('tools_setup_checking'));
+
+      const status = await window.__TAURI__.core.invoke('setup_tools');
+      console.log('[tools] Setup complete:', status);
+
+      if (toolsOverlay) toolsOverlay.hidden = true;
+
+      // Check for yt-dlp updates in the background (non-blocking)
+      window.__TAURI__.core.invoke('check_ytdlp_update').then((info) => {
+        if (info && info.update_available) {
+          console.log('[tools] yt-dlp update available:', info.latest_version);
+          showToast(t('tools_update_available', { latest: info.latest_version || '' }), 'warning');
+        }
+      }).catch(() => {});
+    } catch (err) {
+      console.error('[tools] Setup failed:', err);
+      updateToolsOverlay(0, t('tools_setup_error', { error: String(err) }), '');
+      // Don't block the app — hide overlay after 4s even on error
+      setTimeout(() => {
+        if (toolsOverlay) toolsOverlay.hidden = true;
+      }, 4000);
+    } finally {
+      if (unlistenFn) unlistenFn();
+    }
+  }
+
+  runToolsSetup();
+
   // ─── Initialize components ─────────────────────────────────
   UrlInput.init();
   initCaptureMode();
