@@ -220,17 +220,17 @@ pub async fn ensure_ytdlp(app: &AppHandle) -> Result<PathBuf, String> {
 
 // ─── ffmpeg ───────────────────────────────────────────────────────────────────
 
-/// Ensure `ffmpeg.exe` exists in `tools/`. Downloads and extracts if missing.
-/// Returns the path to the binary.
+/// Ensure `ffmpeg.exe` and `ffprobe.exe` exist in `tools/`. Downloads and extracts if missing.
+/// Returns the path to `ffmpeg.exe`.
 pub async fn ensure_ffmpeg(app: &AppHandle) -> Result<PathBuf, String> {
-    let exe_name = "ffmpeg.exe";
-    let dest = tool_path(exe_name);
+    let ffmpeg_dest = tool_path("ffmpeg.exe");
+    let ffprobe_dest = tool_path("ffprobe.exe");
 
     emit_progress(app, "ffmpeg", "checking", 0, "Checking ffmpeg...");
 
-    if dest.exists() {
+    if ffmpeg_dest.exists() && ffprobe_dest.exists() {
         emit_progress(app, "ffmpeg", "ready", 100, "ffmpeg is ready");
-        return Ok(dest);
+        return Ok(ffmpeg_dest);
     }
 
     // Create tools/ directory if needed
@@ -241,42 +241,77 @@ pub async fn ensure_ffmpeg(app: &AppHandle) -> Result<PathBuf, String> {
     let zip_path = tools_dir().join("ffmpeg-download.zip");
     download_to_file(app, "ffmpeg", FFMPEG_ZIP_URL, &zip_path).await?;
 
-    // Extract ffmpeg.exe from the zip
-    emit_progress(app, "ffmpeg", "extracting", 50, "Extracting ffmpeg.exe...");
-    extract_ffmpeg_from_zip(&zip_path, &dest)?;
+    // Extract ffmpeg.exe and ffprobe.exe from the zip
+    emit_progress(app, "ffmpeg", "extracting", 50, "Extracting ffmpeg & ffprobe...");
+    extract_binaries_from_zip(&zip_path, &[
+        ("ffmpeg.exe", &ffmpeg_dest),
+        ("ffprobe.exe", &ffprobe_dest),
+    ])?;
 
     // Clean up zip
     let _ = std::fs::remove_file(&zip_path);
 
     emit_progress(app, "ffmpeg", "ready", 100, "ffmpeg installed");
-    Ok(dest)
+    Ok(ffmpeg_dest)
 }
 
-/// Extract `ffmpeg.exe` from `*/bin/ffmpeg.exe` inside the BtbN zip archive.
-fn extract_ffmpeg_from_zip(zip_path: &std::path::Path, dest: &std::path::Path) -> Result<(), String> {
+/// Extract multiple binaries from `*/bin/<name>` inside the BtbN zip archive.
+///
+/// `targets` is a slice of `(binary_name, destination_path)` pairs.
+fn extract_binaries_from_zip(
+    zip_path: &std::path::Path,
+    targets: &[(&str, &std::path::Path)],
+) -> Result<(), String> {
     let zip_file = std::fs::File::open(zip_path)
         .map_err(|e| format!("Failed to open zip: {e}"))?;
     let mut archive = zip::ZipArchive::new(zip_file)
         .map_err(|e| format!("Failed to read zip archive: {e}"))?;
+
+    let mut found: Vec<bool> = vec![false; targets.len()];
 
     for i in 0..archive.len() {
         let mut entry = archive
             .by_index(i)
             .map_err(|e| format!("Failed to read zip entry {i}: {e}"))?;
         let name = entry.name().to_string();
-        // Match `<any-dir>/bin/ffmpeg.exe`
-        if name.ends_with("/bin/ffmpeg.exe") || name == "bin/ffmpeg.exe" {
-            let mut out = std::fs::File::create(dest)
-                .map_err(|e| format!("Failed to create ffmpeg.exe: {e}"))?;
-            std::io::copy(&mut entry, &mut out)
-                .map_err(|e| format!("Failed to extract ffmpeg.exe: {e}"))?;
-            out.flush()
-                .map_err(|e| format!("Failed to flush ffmpeg.exe: {e}"))?;
+
+        for (idx, (bin_name, dest)) in targets.iter().enumerate() {
+            if found[idx] {
+                continue;
+            }
+            let suffix = format!("/bin/{bin_name}");
+            if name.ends_with(&suffix) || name == format!("bin/{bin_name}") {
+                let mut out = std::fs::File::create(dest)
+                    .map_err(|e| format!("Failed to create {bin_name}: {e}"))?;
+                std::io::copy(&mut entry, &mut out)
+                    .map_err(|e| format!("Failed to extract {bin_name}: {e}"))?;
+                out.flush()
+                    .map_err(|e| format!("Failed to flush {bin_name}: {e}"))?;
+                found[idx] = true;
+                break;
+            }
+        }
+
+        if found.iter().all(|&f| f) {
             return Ok(());
         }
     }
 
-    Err("ffmpeg.exe not found inside the downloaded zip archive".to_string())
+    let missing: Vec<&str> = targets
+        .iter()
+        .zip(found.iter())
+        .filter(|(_, &f)| !f)
+        .map(|((name, _), _)| *name)
+        .collect();
+
+    if !missing.is_empty() {
+        return Err(format!(
+            "{} not found inside the downloaded zip archive",
+            missing.join(", ")
+        ));
+    }
+
+    Ok(())
 }
 
 // ─── Tauri commands ───────────────────────────────────────────────────────────

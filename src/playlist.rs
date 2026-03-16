@@ -121,26 +121,9 @@ fn extract_query_param(url: &str, param_name: &str) -> Option<String> {
 
 // ─── yt-dlp Playlist Fetching ───────────────────────────────────────
 
-/// Resolve the path to yt-dlp executable.
-/// Looks for yt-dlp.exe next to the running executable first,
-/// then falls back to PATH.
+/// Resolve the path to yt-dlp executable via tools_manager.
 fn resolve_ytdlp_path() -> PathBuf {
-    // Check next to executable
-    if let Ok(exe_path) = std::env::current_exe() {
-        if let Some(exe_dir) = exe_path.parent() {
-            let ytdlp = exe_dir.join("yt-dlp.exe");
-            if ytdlp.exists() {
-                return ytdlp;
-            }
-            // Also check without .exe (for non-Windows dev environments)
-            let ytdlp_unix = exe_dir.join("yt-dlp");
-            if ytdlp_unix.exists() {
-                return ytdlp_unix;
-            }
-        }
-    }
-    // Fall back to PATH
-    PathBuf::from("yt-dlp")
+    crate::tools_manager::resolve_ytdlp_path()
 }
 
 /// Raw JSON entry from yt-dlp --flat-playlist --dump-json output.

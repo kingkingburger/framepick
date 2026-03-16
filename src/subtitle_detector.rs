@@ -55,32 +55,9 @@ impl SubtitleCheckResult {
     }
 }
 
-/// Resolve the path to yt-dlp executable.
-///
-/// Looks for `yt-dlp.exe` (Windows) or `yt-dlp` next to the running executable
-/// for portable distribution. Falls back to system PATH.
+/// Resolve the path to yt-dlp executable via tools_manager.
 pub fn resolve_ytdlp_path() -> PathBuf {
-    // First try next to the executable (portable mode)
-    if let Ok(exe_path) = std::env::current_exe() {
-        if let Some(exe_dir) = exe_path.parent() {
-            let ytdlp_name = if cfg!(windows) {
-                "yt-dlp.exe"
-            } else {
-                "yt-dlp"
-            };
-            let portable_path = exe_dir.join(ytdlp_name);
-            if portable_path.exists() {
-                return portable_path;
-            }
-        }
-    }
-
-    // Fall back to PATH
-    PathBuf::from(if cfg!(windows) {
-        "yt-dlp.exe"
-    } else {
-        "yt-dlp"
-    })
+    crate::tools_manager::resolve_ytdlp_path()
 }
 
 /// Check subtitle availability for a YouTube video using yt-dlp.
