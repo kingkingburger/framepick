@@ -11,7 +11,7 @@ use crate::settings::SettingsState;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
-use tauri::State;
+use tauri::{State, Url};
 
 /// Summary info for a library entry shown in the dashboard.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -381,12 +381,14 @@ pub async fn open_slides_external(
         ));
     }
 
-    let path_str = slides_path.to_string_lossy().to_string();
+    // Convert to file:// URL for proper browser opening
+    let file_url = Url::from_file_path(&slides_path)
+        .map_err(|_| format!("Failed to create file URL for '{}'", slides_path.display()))?;
 
     // Use tauri-plugin-opener to open the file in the default browser
     use tauri_plugin_opener::OpenerExt;
     app.opener()
-        .open_url(&path_str, None::<&str>)
+        .open_url(file_url.as_str(), None::<&str>)
         .map_err(|e| format!("Failed to open in browser: {}", e))?;
 
     Ok(())

@@ -182,28 +182,37 @@ async fn process_queue_loop(app: &AppHandle) {
                 });
             }
             Err(error_msg) => {
-                // Emit pipeline:error with the stage context for richer frontend toast
-                let _ = app.emit("pipeline:error", crate::progress::ErrorPayload {
-                    queue_id: item.id,
-                    stage: crate::progress::PipelineStage::Done, // generic; stage detail is in message
-                    message: error_msg.clone(),
-                });
+                // Don't overwrite "skipped" status (set by duplicate detection)
+                let current_status = {
+                    let pipeline = app.state::<PipelineState>();
+                    pipeline.queue.lock().ok()
+                        .and_then(|q| q.iter().find(|i| i.id == item.id).map(|i| i.status.clone()))
+                        .unwrap_or_default()
+                };
+                if current_status != "skipped" {
+                    // Emit pipeline:error with the stage context for richer frontend toast
+                    let _ = app.emit("pipeline:error", crate::progress::ErrorPayload {
+                        queue_id: item.id,
+                        stage: crate::progress::PipelineStage::Done, // generic; stage detail is in message
+                        message: error_msg.clone(),
+                    });
 
-                update_item_status(
-                    app,
-                    item.id,
-                    "failed",
-                    item.title.clone(),
-                    Some(error_msg.clone()),
-                    None,
-                );
-                emit_status_event(app, &QueueStatusEvent {
-                    id: item.id,
-                    status: "failed".to_string(),
-                    progress: None,
-                    title: item.title.clone(),
-                    error: Some(error_msg),
-                });
+                    update_item_status(
+                        app,
+                        item.id,
+                        "failed",
+                        item.title.clone(),
+                        Some(error_msg.clone()),
+                        None,
+                    );
+                    emit_status_event(app, &QueueStatusEvent {
+                        id: item.id,
+                        status: "failed".to_string(),
+                        progress: None,
+                        title: item.title.clone(),
+                        error: Some(error_msg),
+                    });
+                }
             }
         }
 
@@ -231,6 +240,9 @@ async fn process_single_item(
     // Stage 1: Validate URL
     let video_id = crate::url_validator::extract_video_id(&item.url)
         .ok_or_else(|| "Invalid YouTube URL".to_string())?;
+
+    // Reconstruct a canonical, sanitized URL from the validated video ID
+    let safe_url = format!("https://www.youtube.com/watch?v={}", video_id);
 
     // Stage 1b: Check if video already exists in library (duplicate detection)
     {
@@ -262,7 +274,7 @@ async fn process_single_item(
     }
 
     // ─── Resolve effective capture mode (subtitle fallback logic) ──────
-    let url_for_resolve = item.url.clone();
+    let url_for_resolve = safe_url.clone();
     let mode_for_resolve = item.capture_mode.clone();
 
     let resolved = tauri::async_runtime::spawn_blocking(move || {
@@ -291,7 +303,7 @@ async fn process_single_item(
     // ─── Stage: Fetch metadata ────────────────────────────────────
     tracker.emit(app, 0, Some("Fetching video metadata...".to_string()));
 
-    let url_for_meta = item.url.clone();
+    let url_for_meta = safe_url.clone();
     let meta = tauri::async_runtime::spawn_blocking(move || metadata::fetch_metadata(&url_for_meta))
         .await
         .map_err(|e| format!("Metadata task panicked: {e}"))?
@@ -326,7 +338,7 @@ async fn process_single_item(
     // ─── Stage: Download video ────────────────────────────────────
     tracker.emit(app, 0, Some("Downloading video...".to_string()));
 
-    let url_for_dl = item.url.clone();
+    let url_for_dl = safe_url.clone();
     let video_dir_for_dl = video_dir.clone();
     let video_id_for_dl = video_id.clone();
     let quality_for_dl = download_quality.clone();

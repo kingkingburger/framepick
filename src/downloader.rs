@@ -36,6 +36,10 @@ pub fn download_video(
     video_id: &str,
     quality: &str,
 ) -> Result<DownloadResult, String> {
+    if quality != "best" && quality.parse::<u32>().is_err() {
+        return Err(format!("Invalid quality value: {}", quality));
+    }
+
     let source_dir = output_dir.join("source");
     std::fs::create_dir_all(&source_dir)
         .map_err(|e| format!("Failed to create source directory: {e}"))?;
