@@ -1,2 +1,5 @@
 /target
 .omc/
+
+# Distribution
+dist/
