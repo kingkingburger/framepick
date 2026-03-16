@@ -2,6 +2,7 @@ pub mod capture;
 pub mod capture_fallback;
 pub mod cleanup;
 pub mod config;
+pub mod downloader;
 pub mod input_state;
 pub mod metadata;
 pub mod playlist;
