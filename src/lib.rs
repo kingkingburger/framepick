@@ -29,6 +29,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_opener::init())
         .manage(SettingsState(std::sync::Mutex::new(initial_settings)))
         .manage(PipelineState::new())
         .invoke_handler(tauri::generate_handler![
@@ -74,6 +75,7 @@ pub fn run() {
             // Queue processing
             queue_processor::start_queue_processing,
             queue_processor::get_processing_status,
+            queue_processor::get_item_progress,
             // Playlist detection & fetching
             playlist::detect_playlist_url,
             playlist::fetch_playlist,
