@@ -1,0 +1,130 @@
+/* ============================================
+   framepick - Shared Dark Theme
+   ============================================
+   Common CSS custom properties (variables) used by:
+   - Tauri app UI (style.css imports this file)
+   - Generated slides.html (embedded via slides_generator.rs)
+
+   Edit this file to change the theme everywhere.
+   ============================================ */
+
+:root {
+  /* ── Background colors ── */
+  --fp-bg-body: #1a1a2e;
+  --fp-bg-sidebar: #16213e;
+  --fp-bg-surface: #0f3460;
+  --fp-bg-card: #1a1a2e;
+  --fp-bg-input: #1a1a3e;
+  --fp-bg-overlay: rgba(0, 0, 0, 0.78);
+  --fp-bg-overlay-light: rgba(0, 0, 0, 0.6);
+  --fp-bg-hover: #1e1e32;
+  --fp-bg-active: #252540;
+  --fp-bg-image: #000;
+  --fp-bg-scrollbar-track: transparent;
+  --fp-bg-scrollbar-thumb: #333;
+  --fp-bg-scrollbar-thumb-hover: #555;
+
+  /* ── Text colors ── */
+  --fp-text-primary: #e0e0e0;
+  --fp-text-secondary: #a0a0b8;
+  --fp-text-hint: #7a7a94;
+  --fp-text-muted: #666;
+  --fp-text-heading: #ffffff;
+  --fp-text-body: #d4d4d4;
+  --fp-text-meta: #888;
+  --fp-text-footer: #444;
+
+  /* ── Accent colors ── */
+  --fp-accent: #e94560;
+  --fp-accent-hover: #ff6b81;
+  --fp-accent-light: #ff8fa3;
+  --fp-accent-subtle: rgba(233, 69, 96, 0.12);
+
+  /* ── Border colors ── */
+  --fp-border: #2a2a4a;
+  --fp-border-focus: #e94560;
+  --fp-border-subtle: #1a1a2a;
+
+  /* ── Shadows ── */
+  --fp-shadow: rgba(0, 0, 0, 0.3);
+  --fp-shadow-card: 0 2px 12px rgba(0, 0, 0, 0.5);
+  --fp-shadow-card-hover: 0 4px 24px rgba(233, 69, 96, 0.12);
+  --fp-shadow-toggle: 0 2px 12px rgba(233, 69, 96, 0.4);
+
+  /* ── Border radius ── */
+  --fp-radius: 8px;
+  --fp-radius-sm: 4px;
+  --fp-radius-lg: 12px;
+  --fp-radius-pill: 9999px;
+
+  /* ── Transitions ── */
+  --fp-transition: 0.2s ease;
+  --fp-transition-fast: 0.18s ease;
+
+  /* ── Typography ── */
+  --fp-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
+  --fp-font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  --fp-font-size-xs: 0.7rem;
+  --fp-font-size-sm: 0.78rem;
+  --fp-font-size-base: 0.95rem;
+  --fp-font-size-lg: 1rem;
+
+  /* ── Spacing ── */
+  --fp-spacing-xs: 4px;
+  --fp-spacing-sm: 8px;
+  --fp-spacing-md: 16px;
+  --fp-spacing-lg: 24px;
+  --fp-spacing-xl: 48px;
+
+  /* ── Select/form specific ── */
+  --fp-select-arrow: #a0a0b8;
+
+  /* ── Semantic status colors ── */
+  --fp-success: #22c55e;
+  --fp-success-light: #4ade80;
+  --fp-success-bg: rgba(34, 197, 94, 0.12);
+  --fp-success-bg-strong: rgba(34, 197, 94, 0.15);
+  --fp-error: #ef4444;
+  --fp-error-light: #f87171;
+  --fp-error-bg: rgba(239, 68, 68, 0.12);
+  --fp-error-bg-strong: rgba(239, 68, 68, 0.15);
+  --fp-error-border: rgba(239, 68, 68, 0.3);
+  --fp-warning: #f59e0b;
+  --fp-warning-bg: rgba(245, 158, 11, 0.12);
+  --fp-warning-border: rgba(245, 158, 11, 0.3);
+
+  /* ── Deep background tones ── */
+  --fp-bg-deep: #111;
+  --fp-bg-deepest: #0f0f0f;
+
+  /* ── On-accent text (for buttons/badges on colored backgrounds) ── */
+  --fp-text-on-accent: #fff;
+  --fp-text-on-warning: #1a1a2a;
+
+  /* ── Accent glow / subtle fills ── */
+  --fp-accent-glow: rgba(233, 69, 96, 0.15);
+  --fp-accent-bg: rgba(233, 69, 96, 0.08);
+  --fp-accent-bg-faint: rgba(233, 69, 96, 0.05);
+  --fp-accent-bg-light: rgba(233, 69, 96, 0.1);
+  --fp-accent-focus-ring: rgba(233, 69, 96, 0.15);
+  --fp-accent-focus-ring-strong: rgba(233, 69, 96, 0.25);
+  --fp-accent-shadow: rgba(233, 69, 96, 0.3);
+  --fp-accent-border: rgba(233, 69, 96, 0.6);
+  --fp-accent-solid: rgba(233, 69, 96, 0.85);
+
+  /* ── Overlay / shadow helpers ── */
+  --fp-overlay: rgba(0, 0, 0, 0.6);
+  --fp-overlay-heavy: rgba(0, 0, 0, 0.78);
+  --fp-overlay-light: rgba(0, 0, 0, 0.75);
+  --fp-shadow-deep: rgba(0, 0, 0, 0.4);
+  --fp-shadow-footer: rgba(0, 0, 0, 0.1);
+
+  /* ── Neutral tints ── */
+  --fp-neutral-tint: rgba(160, 160, 184, 0.15);
+  --fp-neutral-tint-light: rgba(160, 160, 184, 0.12);
+  --fp-neutral-tint-border: rgba(160, 160, 184, 0.3);
+  --fp-border-translucent: rgba(42, 42, 74, 0.4);
+  --fp-border-solid-bg: rgba(42, 42, 74, 0.85);
+  --fp-border-solid-bg-full: rgba(42, 42, 74, 1);
+  --fp-info-bg: rgba(106, 153, 255, 0.15);
+}

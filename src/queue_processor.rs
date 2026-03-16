@@ -87,6 +87,42 @@ pub async fn start_queue_processing(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Get the pipeline progress for a specific queue item.
+/// Returns the current stage, stage number, total stages, percent, and detail.
+#[tauri::command]
+pub fn get_item_progress(
+    id: u32,
+    app: AppHandle,
+) -> Result<Option<ItemProgressInfo>, String> {
+    let pipeline = app.state::<PipelineState>();
+    let queue = pipeline.queue.lock().map_err(|e| e.to_string())?;
+    let item = queue.iter().find(|q| q.id == id);
+    Ok(item.and_then(|q| {
+        q.pipeline_stage.as_ref().map(|stage| ItemProgressInfo {
+            queue_id: q.id,
+            stage: stage.clone(),
+            stage_number: q.pipeline_stage_number.unwrap_or(0),
+            total_stages: q.pipeline_total_stages.unwrap_or(0),
+            percent: q.progress.unwrap_or(0),
+            detail: q.pipeline_detail.clone(),
+            status: q.status.clone(),
+        })
+    }))
+}
+
+/// Detailed progress information for a specific queue item.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ItemProgressInfo {
+    pub queue_id: u32,
+    pub stage: String,
+    pub stage_number: u32,
+    pub total_stages: u32,
+    pub percent: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+    pub status: String,
+}
+
 /// Get the current processing status.
 #[tauri::command]
 pub fn get_processing_status(app: AppHandle) -> Result<QueueProgressEvent, String> {
@@ -146,6 +182,13 @@ async fn process_queue_loop(app: &AppHandle) {
                 });
             }
             Err(error_msg) => {
+                // Emit pipeline:error with the stage context for richer frontend toast
+                let _ = app.emit("pipeline:error", crate::progress::ErrorPayload {
+                    queue_id: item.id,
+                    stage: crate::progress::PipelineStage::Done, // generic; stage detail is in message
+                    message: error_msg.clone(),
+                });
+
                 update_item_status(
                     app,
                     item.id,
@@ -305,9 +348,11 @@ async fn process_single_item(
     let video_dir_for_cap = video_dir.clone();
     let effective_mode_for_cap = effective_mode.clone();
 
-    let captured_frames = tauri::async_runtime::spawn_blocking(move || {
+    // Capture returns (frames, optional subtitle cues for text association)
+    let (captured_frames, subtitle_cues) = tauri::async_runtime::spawn_blocking(move || {
         match effective_mode_for_cap.as_str() {
             "scene" => capture::capture_scene_change(&mp4_path, &video_dir_for_cap, scene_threshold)
+                .map(|frames| (frames, Vec::new()))
                 .map_err(|e| e.to_string()),
             "interval" => capture::capture_interval(
                 &mp4_path,
@@ -315,10 +360,11 @@ async fn process_single_item(
                 interval_seconds,
                 None,
             )
+            .map(|frames| (frames, Vec::new()))
             .map_err(|e| e.to_string()),
             // "subtitle" (or any unknown mode — fall back to subtitle mode)
             _ => capture::capture_subtitle(&mp4_path, &video_dir_for_cap)
-                .map(|r| r.frames)
+                .map(|r| (r.frames, r.cues))
                 .map_err(|e| e.to_string()),
         }
     })
@@ -336,8 +382,15 @@ async fn process_single_item(
     // ─── Stage: Generate slides ───────────────────────────────────
     tracker.emit(app, 0, Some("Generating slides...".to_string()));
 
-    // Convert captured frames to segments
-    let segments: Vec<Segment> = slides_generator::frames_to_segments(&captured_frames);
+    // Convert captured frames to segments.
+    // When subtitle cues are available (subtitle mode without fallback),
+    // associate subtitle text with frames. Otherwise, frames display
+    // timestamp only (e.g. "[00:01:30]").
+    let segments: Vec<Segment> = if subtitle_cues.is_empty() {
+        slides_generator::frames_to_segments(&captured_frames)
+    } else {
+        slides_generator::frames_to_segments_with_subtitles(&captured_frames, &subtitle_cues)
+    };
 
     // Save segments.json to video_dir
     let segments_json_path = video_dir.join("segments.json");
@@ -431,6 +484,13 @@ fn update_item_status(
             }
             if let Some(p) = progress {
                 item.progress = Some(p);
+            }
+            // Clear pipeline stage info on terminal statuses
+            if status == "completed" || status == "failed" || status == "skipped" {
+                item.pipeline_stage = None;
+                item.pipeline_stage_number = None;
+                item.pipeline_total_stages = None;
+                item.pipeline_detail = None;
             }
         }
     }
