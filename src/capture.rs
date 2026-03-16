@@ -505,7 +505,7 @@ fn find_and_parse_subtitles(video_path: &Path) -> Option<Vec<f64>> {
             let path = entry.path();
             if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
                 let ext_lower = ext.to_lowercase();
-                if ext_lower == "vtt" || ext_lower == "srt" {
+                if ext_lower == "vtt" || ext_lower == "srt" || ext_lower == "json3" {
                     // Prefer files matching the video stem, but collect all
                     subtitle_files.push(path);
                 }
@@ -558,6 +558,7 @@ fn find_and_parse_subtitles(video_path: &Path) -> Option<Vec<f64>> {
             let timestamps = match ext.as_str() {
                 "vtt" => parse_vtt_timestamps(&content),
                 "srt" => parse_srt_timestamps(&content),
+                "json3" => parse_json3_timestamps(&content),
                 _ => continue,
             };
             if !timestamps.is_empty() {
@@ -593,7 +594,7 @@ fn find_and_parse_subtitle_cues(
             let path = entry.path();
             if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
                 let ext_lower = ext.to_lowercase();
-                if ext_lower == "vtt" || ext_lower == "srt" {
+                if ext_lower == "vtt" || ext_lower == "srt" || ext_lower == "json3" {
                     subtitle_files.push(path);
                 }
             }
@@ -641,6 +642,7 @@ fn find_and_parse_subtitle_cues(
             let cues_result = match ext.as_str() {
                 "vtt" => crate::subtitle_extractor::parse_vtt(&content),
                 "srt" => crate::subtitle_extractor::parse_srt(&content),
+                "json3" => parse_json3_cues(&content),
                 _ => continue,
             };
             if let Ok(cues) = cues_result {
@@ -734,6 +736,99 @@ pub fn parse_srt_timestamps(content: &str) -> Vec<f64> {
 
     timestamps.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     timestamps
+}
+
+/// Parse YouTube json3 subtitle file for cue start timestamps.
+///
+/// json3 format (as downloaded by yt-dlp):
+/// ```json
+/// {"events":[{"tStartMs":0,"dDurationMs":5000,"segs":[{"utf8":"Hello"}]}, ...]}
+/// ```
+///
+/// Returns deduplicated, sorted timestamps in seconds.
+pub fn parse_json3_timestamps(content: &str) -> Vec<f64> {
+    let mut timestamps: Vec<f64> = Vec::new();
+
+    let Ok(root) = serde_json::from_str::<serde_json::Value>(content) else {
+        return timestamps;
+    };
+
+    let Some(events) = root.get("events").and_then(|e| e.as_array()) else {
+        return timestamps;
+    };
+
+    for event in events {
+        // Skip events without segments (header/metadata events)
+        if event.get("segs").is_none() {
+            continue;
+        }
+        if let Some(start_ms) = event.get("tStartMs").and_then(|v| v.as_f64()) {
+            let secs = start_ms / 1000.0;
+            // Deduplicate: skip if within 1.0s of previous timestamp
+            if timestamps
+                .last()
+                .map_or(true, |&prev| (secs - prev).abs() > 1.0)
+            {
+                timestamps.push(secs);
+            }
+        }
+    }
+
+    timestamps.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    timestamps
+}
+
+/// Parse YouTube json3 subtitle file into full subtitle cues (with text).
+///
+/// json3 format (as downloaded by yt-dlp):
+/// ```json
+/// {"events":[{"tStartMs":0,"dDurationMs":5000,"segs":[{"utf8":"Hello"}]}, ...]}
+/// ```
+fn parse_json3_cues(content: &str) -> Result<Vec<crate::subtitle_extractor::SubtitleCue>, String> {
+    let root: serde_json::Value =
+        serde_json::from_str(content).map_err(|e| format!("json3 parse error: {e}"))?;
+
+    let events = root
+        .get("events")
+        .and_then(|e| e.as_array())
+        .ok_or_else(|| "json3: missing 'events' array".to_string())?;
+
+    let mut cues = Vec::new();
+
+    for event in events {
+        let segs = match event.get("segs").and_then(|s| s.as_array()) {
+            Some(s) => s,
+            None => continue, // no text segments — skip
+        };
+
+        let start_ms = match event.get("tStartMs").and_then(|v| v.as_f64()) {
+            Some(v) => v,
+            None => continue,
+        };
+        let duration_ms = event
+            .get("dDurationMs")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0);
+
+        let text: String = segs
+            .iter()
+            .filter_map(|seg| seg.get("utf8").and_then(|t| t.as_str()))
+            .collect::<Vec<&str>>()
+            .join("");
+
+        let text = text.trim().to_string();
+        if text.is_empty() {
+            continue;
+        }
+
+        cues.push(crate::subtitle_extractor::SubtitleCue {
+            start_secs: start_ms / 1000.0,
+            end_secs: (start_ms + duration_ms) / 1000.0,
+            text,
+        });
+    }
+
+    Ok(cues)
 }
 
 /// Parse a subtitle timestamp string into seconds.
