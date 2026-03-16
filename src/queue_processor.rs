@@ -222,10 +222,6 @@ async fn process_queue_loop(app: &AppHandle) {
 
 /// Process a single queue item through the download → capture → slides pipeline.
 ///
-/// This is a placeholder that will be filled in by future ACs implementing
-/// the actual download/capture/slides-generation logic. For now it validates
-/// the URL and uses the ProgressTracker to simulate processing stages.
-///
 /// **Duplicate detection**: Before processing, checks if the video ID already
 /// exists in the library folder. If so, skips processing and marks as "skipped".
 ///
