@@ -52,17 +52,13 @@ pub fn download_video(
 
     let ytdlp = resolve_ytdlp_path();
 
+    // Step 1: Download video only (no subtitles — keeps this call robust)
     let output = Command::new(&ytdlp)
         .args([
             "-f",
             &format,
             "--merge-output-format",
             "mp4",
-            "--write-auto-sub",
-            "--sub-lang",
-            "ko,en",
-            "--sub-format",
-            "json3/best",
             "--no-playlist",
             "-o",
             &output_template,
@@ -88,6 +84,29 @@ pub fn download_video(
             "MP4 file not found after download: {}",
             mp4_path.display()
         ));
+    }
+
+    // Step 2: Try to download subtitles separately (non-fatal)
+    let sub_output = Command::new(&ytdlp)
+        .args([
+            "--write-auto-sub",
+            "--sub-lang",
+            "ko,en",
+            "--sub-format",
+            "json3/best",
+            "--skip-download",
+            "--no-playlist",
+            "-o",
+            &output_template,
+            url,
+        ])
+        .output();
+
+    if let Ok(out) = &sub_output {
+        if !out.status.success() {
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            eprintln!("[downloader] Subtitle download failed (non-fatal): {}", stderr.trim());
+        }
     }
 
     let subtitle_path = find_subtitle_file(&source_dir, video_id);
