@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::process::Command;
 
+use crate::cmd_util::HideWindow;
+
 /// A single video entry extracted from a playlist via yt-dlp --flat-playlist.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlaylistEntry {
@@ -178,6 +180,7 @@ pub fn fetch_playlist_entries(url: &str) -> Result<PlaylistResult, String> {
             "30",
             url,
         ])
+        .hide_window()
         .output()
         .map_err(|e| {
             format!(

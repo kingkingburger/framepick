@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use crate::cmd_util::HideWindow;
 use crate::subtitle_detector::{resolve_ytdlp_path, SubtitleCheckResult};
 
 /// Default language priority: Korean first, then English.
@@ -256,6 +257,7 @@ pub fn download_subtitles(
 
     let output = Command::new(&ytdlp)
         .args(&args)
+        .hide_window()
         .output()
         .map_err(|e| format!("Failed to run yt-dlp: {e}"))?;
 

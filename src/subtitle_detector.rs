@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::process::Command;
 
+use crate::cmd_util::HideWindow;
+
 /// Result of subtitle availability check.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubtitleCheckResult {
@@ -90,6 +92,7 @@ pub fn check_subtitles(video_url: &str) -> SubtitleCheckResult {
 
     let output = match Command::new(&ytdlp_path)
         .args(["--list-subs", "--skip-download", video_url])
+        .hide_window()
         .output()
     {
         Ok(output) => output,

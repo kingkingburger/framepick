@@ -7,6 +7,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use crate::cmd_util::HideWindow;
 use crate::metadata::resolve_ytdlp_path;
 
 /// Result of a successful video download.
@@ -64,6 +65,7 @@ pub fn download_video(
             &output_template,
             url,
         ])
+        .hide_window()
         .output()
         .map_err(|e| {
             format!(
@@ -100,6 +102,7 @@ pub fn download_video(
             &output_template,
             url,
         ])
+        .hide_window()
         .output();
 
     if let Ok(out) = &sub_output {

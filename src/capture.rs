@@ -14,6 +14,8 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use crate::cmd_util::HideWindow;
+
 /// Default scene-change detection threshold (0.0–1.0).
 /// A value of 0.30 means a frame is captured when the difference
 /// from the previous frame exceeds 30%.
@@ -228,6 +230,7 @@ fn detect_scene_changes(
             "null",
             "-",
         ])
+        .hide_window()
         .output()
         .map_err(|e| CaptureError::FfmpegNotFound(format!("Failed to run ffmpeg: {e}")))?;
 
@@ -286,6 +289,7 @@ fn extract_frame_at(
             "-y", // overwrite
             output_path.to_str().unwrap_or(""),
         ])
+        .hide_window()
         .output()
         .map_err(|e| CaptureError::FfmpegNotFound(format!("Failed to run ffmpeg: {e}")))?;
 
@@ -379,6 +383,7 @@ fn probe_duration(video_path: &Path) -> Result<f64, CaptureError> {
             "csv=p=0",
             video_path.to_str().unwrap_or(""),
         ])
+        .hide_window()
         .output()
         .map_err(|e| CaptureError::FfmpegNotFound(format!("Failed to run ffprobe: {e}")))?;
 

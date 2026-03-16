@@ -1,4 +1,5 @@
 pub mod capture;
+pub mod cmd_util;
 pub mod capture_fallback;
 pub mod cleanup;
 pub mod config;

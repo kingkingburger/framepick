@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::process::Command;
 
+use crate::cmd_util::HideWindow;
+
 /// Core metadata for a YouTube video.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VideoMetadata {
@@ -76,6 +78,7 @@ pub fn fetch_metadata(url: &str) -> Result<VideoMetadata, String> {
 
     let output = Command::new(&ytdlp_path)
         .args(["--dump-json", "--no-playlist", url])
+        .hide_window()
         .output()
         .map_err(|e| {
             format!(
