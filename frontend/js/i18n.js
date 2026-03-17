@@ -1,6 +1,12 @@
 /**
- * i18n - Internationalization module for framepick
- * Default: Korean (ko), also supports English (en)
+ * @file i18n.js
+ * @description framepick 다국어 지원 모듈
+ *
+ * 기본 언어: 한국어(ko), 영어(en) 지원
+ * 제공 기능:
+ *  - t(key, params): 현재 언어로 번역된 문자열 반환 (파라미터 보간 지원)
+ *  - setLanguage(lang): UI 전체 언어를 변경하고 data-i18n 요소를 일괄 업데이트
+ *  - getLanguage(): 현재 언어 코드 반환
  */
 const I18N = {
   ko: {
@@ -381,6 +387,13 @@ const I18N = {
 
 let currentLang = 'ko';
 
+/**
+ * 현재 언어로 번역된 문자열을 반환한다.
+ * 현재 언어에 키가 없으면 한국어로 폴백하고, 그것도 없으면 키 자체를 반환한다.
+ * @param {string} key - 번역 키
+ * @param {Object} [params] - 보간할 파라미터 ({ n: 5 } → "{n}" 치환)
+ * @returns {string} 번역된 문자열
+ */
 function t(key, params) {
   const str = (I18N[currentLang] && I18N[currentLang][key]) || (I18N['ko'][key]) || key;
   if (params) {
@@ -389,33 +402,41 @@ function t(key, params) {
   return str;
 }
 
+/**
+ * UI 전체 언어를 변경하고 data-i18n 속성이 있는 모든 요소를 업데이트한다.
+ * @param {string} lang - 언어 코드 ('ko' | 'en')
+ */
 function setLanguage(lang) {
   currentLang = lang;
   document.documentElement.setAttribute('lang', lang);
-  // Update all elements with data-i18n attribute
+  // data-i18n 속성이 있는 모든 요소 텍스트 업데이트
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
     const params = el.getAttribute('data-i18n-params');
     el.textContent = t(key, params ? JSON.parse(params) : null);
   });
-  // Update placeholders
+  // placeholder 속성 업데이트
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
     el.placeholder = t(el.getAttribute('data-i18n-placeholder'));
   });
-  // Update title attributes
+  // title 속성 업데이트
   document.querySelectorAll('[data-i18n-title]').forEach(el => {
     el.title = t(el.getAttribute('data-i18n-title'));
   });
-  // Update select options with data-i18n
+  // select option의 data-i18n 업데이트
   document.querySelectorAll('option[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
     const params = el.getAttribute('data-i18n-params');
     el.textContent = t(key, params ? JSON.parse(params) : null);
   });
-  // Dispatch event for components that need custom update logic
+  // 커스텀 업데이트 로직이 필요한 컴포넌트를 위해 이벤트 발행
   document.dispatchEvent(new CustomEvent('languageChanged', { detail: { lang } }));
 }
 
+/**
+ * 현재 활성 언어 코드를 반환한다.
+ * @returns {string} 현재 언어 코드 ('ko' | 'en')
+ */
 function getLanguage() {
   return currentLang;
 }

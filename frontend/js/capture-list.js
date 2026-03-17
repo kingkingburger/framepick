@@ -1,29 +1,29 @@
 /**
- * capture-list.js - Captured frames list component for framepick
+ * @file capture-list.js
+ * @description framepick 캡쳐된 프레임 목록 컴포넌트
  *
- * Displays a browsable list of captured frames with thumbnails and metadata
- * after a pipeline completes. Users can preview frames before opening the
- * full slides.html viewer.
+ * 파이프라인 완료 후 캡쳐된 프레임 목록을 썸네일 및 메타데이터와 함께 표시한다.
+ * 사용자가 전체 slides.html 뷰어를 열기 전에 프레임을 미리 볼 수 있다.
  *
- * Features:
- *   - Grid view showing frame thumbnails with timestamp badges
- *   - Subtitle text preview on hover / below each frame
- *   - Capture mode + frame count metadata header
- *   - Click on a frame to open the full slides viewer at that index
- *   - Collapsible panel that auto-shows after capture completion
- *   - Responds to language changes
+ * 주요 기능:
+ *   - 타임스탬프 배지가 있는 프레임 썸네일 그리드 뷰
+ *   - 호버/프레임 아래에 자막 텍스트 미리보기
+ *   - 캡쳐 모드 + 프레임 수 메타데이터 헤더
+ *   - 프레임 클릭 시 해당 인덱스의 슬라이드 뷰어 열기
+ *   - 캡쳐 완료 후 자동으로 표시되는 접이식 패널
+ *   - 언어 변경에 반응
  *
- * Data source:
- *   - Reads segments.json + images/ from the library entry folder
- *   - Uses Tauri `get_slides_metadata` command for metadata
- *   - Uses asset protocol URLs for image thumbnails
+ * 데이터 소스:
+ *   - 라이브러리 항목 폴더의 segments.json + images/에서 읽기
+ *   - 메타데이터용 Tauri `get_slides_metadata` 명령 사용
+ *   - 이미지 썸네일용 asset protocol URL 사용
  *
- * Events listened:
- *   - queueItemCompleted: auto-show capture list for the completed item
- *   - languageChanged: re-render labels
+ * 수신 이벤트:
+ *   - queueItemCompleted: 완료된 항목의 캡쳐 목록 자동 표시
+ *   - languageChanged: 레이블 재렌더링
  *
- * Events emitted:
- *   - captureListFrameClicked: { videoId, frameIndex } when user clicks a frame
+ * 발행 이벤트:
+ *   - captureListFrameClicked: { videoId, frameIndex } - 사용자가 프레임 클릭 시
  */
 
 const CaptureList = (() => {
@@ -33,17 +33,17 @@ const CaptureList = (() => {
   let currentMetadata = null;
   let isExpanded = true;
   let viewMode = 'grid'; // 'grid' | 'list'
-  let lightboxIdx = -1;  // -1 = closed
+  let lightboxIdx = -1;  // -1 = 닫힘
 
   /**
-   * Initialize the capture list component.
-   * Creates the container element and sets up event listeners.
+   * 캡쳐 목록 컴포넌트를 초기화한다.
+   * 컨테이너 요소를 생성하고 이벤트 리스너를 설정한다.
    */
   function init() {
-    // Find or create the container element
+    // 컨테이너 요소 찾기 또는 생성
     containerEl = document.getElementById('capture-list-container');
     if (!containerEl) {
-      // Insert capture list container after queue container
+      // 큐 컨테이너 다음에 캡쳐 목록 컨테이너 삽입
       const queueContainer = document.getElementById('queue-container');
       if (queueContainer) {
         containerEl = document.createElement('div');
@@ -55,10 +55,10 @@ const CaptureList = (() => {
       }
     }
 
-    // Listen for queue item completion to auto-show capture list
+    // 큐 항목 완료 시 캡쳐 목록 자동 표시를 위한 이벤트 리스너
     document.addEventListener('queueItemCompleted', _onItemCompleted);
 
-    // Re-render on language changes
+    // 언어 변경 시 재렌더링
     document.addEventListener('languageChanged', () => {
       if (currentVideoId && currentSegments.length > 0) {
         _render();
@@ -67,29 +67,29 @@ const CaptureList = (() => {
   }
 
   /**
-   * Handle queue item completion — load and show the captured frames.
+   * 큐 항목 완료 이벤트를 처리한다 — 캡쳐된 프레임을 로드하고 표시한다.
    * @param {CustomEvent} event
    */
   async function _onItemCompleted(event) {
     const { id } = event.detail;
 
-    // Get the queue item to find its video ID
+    // 영상 ID를 찾기 위해 큐 항목 가져오기
     const queue = typeof QueueUI !== 'undefined' ? QueueUI.getQueue() : [];
     const item = queue.find(q => q.id === id);
 
     if (!item) return;
 
-    // Extract video ID from URL
+    // URL에서 영상 ID 추출
     const videoId = item.videoId || _extractVideoId(item.url);
     if (!videoId) return;
 
-    // Load the captured frames for this video
+    // 이 영상의 캡쳐된 프레임 로드
     await loadFrames(videoId);
   }
 
   /**
-   * Load and display captured frames for a given video ID.
-   * @param {string} videoId - YouTube video ID (library folder name)
+   * 주어진 영상 ID에 대한 캡쳐된 프레임을 로드하고 표시한다.
+   * @param {string} videoId - YouTube 영상 ID (라이브러리 폴더명)
    */
   async function loadFrames(videoId) {
     if (!containerEl) return;
@@ -99,13 +99,13 @@ const CaptureList = (() => {
     currentSegments = [];
     currentMetadata = null;
 
-    // Show loading state
+    // 로딩 상태 표시
     _renderLoading();
 
     try {
       if (window.__TAURI__ && window.__TAURI__.core) {
-        // Use the dedicated get_capture_frames command which reads segments.json
-        // and builds asset protocol thumbnail URLs
+        // segments.json을 읽고 asset protocol 썸네일 URL을 생성하는
+        // 전용 get_capture_frames 명령 사용
         const result = await window.__TAURI__.core.invoke('get_capture_frames', {
           videoId: videoId
         });
@@ -124,7 +124,7 @@ const CaptureList = (() => {
             thumbnailUrl: f.thumbnail_url || '',
           }));
         } else {
-          // Fallback: try get_slides_metadata for basic image list
+          // 폴백: 기본 이미지 목록을 위해 get_slides_metadata 시도
           currentMetadata = await window.__TAURI__.core.invoke('get_slides_metadata', {
             videoId: videoId
           });
@@ -149,7 +149,7 @@ const CaptureList = (() => {
   }
 
   /**
-   * Load segments data for a video entry via the backend.
+   * 백엔드를 통해 영상 항목의 세그먼트 데이터를 로드한다.
    * @param {string} videoId
    * @returns {Promise<Array|null>}
    */
@@ -176,7 +176,7 @@ const CaptureList = (() => {
   }
 
   /**
-   * Extract a video ID from a YouTube URL.
+   * YouTube URL에서 영상 ID를 추출한다.
    * @param {string} url
    * @returns {string|null}
    */
@@ -187,13 +187,13 @@ const CaptureList = (() => {
   }
 
   /**
-   * Extract a human-readable timestamp from an image filename.
-   * e.g. "frame_0001_00-01-23.jpg" → "00:01:23"
+   * 이미지 파일명에서 사람이 읽기 쉬운 타임스탬프를 추출한다.
+   * 예: "frame_0001_00-01-23.jpg" → "00:01:23"
    * @param {string} filename
    * @returns {string}
    */
   function _formatTimestampFromFilename(filename) {
-    // Match pattern like "00-01-23" in filename
+    // 파일명에서 "00-01-23" 패턴 매칭
     const match = filename.match(/(\d{2})-(\d{2})-(\d{2})/);
     if (match) {
       return `${match[1]}:${match[2]}:${match[3]}`;
@@ -202,27 +202,26 @@ const CaptureList = (() => {
   }
 
   /**
-   * Build an asset protocol URL for an image in the library.
+   * 라이브러리의 이미지에 대한 asset protocol URL을 생성한다.
    * @param {string} videoId
    * @param {string} imageName
    * @returns {string}
    */
   function _buildImageUrl(videoId, imageName) {
-    // The get_slides_metadata returns image names relative to images/ dir
-    // We need to build the full asset URL via the backend
-    // For now, use the library path convention
+    // get_slides_metadata는 images/ 디렉터리 기준 상대 이미지명을 반환
+    // 백엔드를 통해 전체 asset URL을 생성해야 함
+    // 현재는 라이브러리 경로 규칙 사용
     if (currentMetadata && currentMetadata.video_id) {
-      // In Tauri context, images are served via asset protocol
-      // The slides_viewer.rs already does this — we can use the same approach
-      // For the capture list thumbnails, we'll reference them as relative paths
-      // and let the backend resolve them
+      // Tauri 컨텍스트에서 이미지는 asset protocol로 제공됨
+      // slides_viewer.rs에서 이미 처리하는 방식과 동일하게 접근
+      // 캡쳐 목록 썸네일은 상대 경로로 참조하고 백엔드가 해석하도록 함
       return `asset://localhost/images/${imageName}`;
     }
     return `images/${imageName}`;
   }
 
   /**
-   * Render loading state.
+   * 로딩 상태를 렌더링한다.
    */
   function _renderLoading() {
     if (!containerEl) return;
@@ -237,7 +236,7 @@ const CaptureList = (() => {
   }
 
   /**
-   * Render error state.
+   * 오류 상태를 렌더링한다.
    * @param {string} message
    */
   function _renderError(message) {
@@ -249,14 +248,14 @@ const CaptureList = (() => {
         </div>
       </div>
     `;
-    // Auto-hide after 5 seconds
+    // 5초 후 자동 숨기기
     setTimeout(() => {
       if (containerEl) containerEl.innerHTML = '';
     }, 5000);
   }
 
   /**
-   * Main render function — builds the full capture list UI.
+   * 메인 렌더 함수 — 전체 캡쳐 목록 UI를 생성한다.
    */
   function _render() {
     if (!containerEl || !currentVideoId) return;
@@ -272,7 +271,7 @@ const CaptureList = (() => {
 
     let html = '<div class="capture-list-panel">';
 
-    // Header with toggle
+    // 토글이 포함된 헤더
     html += '<div class="capture-list-header">';
     html += '<div class="capture-list-header-info">';
     html += `<h3 class="capture-list-title">`;
@@ -287,7 +286,7 @@ const CaptureList = (() => {
     html += `</span>`;
     html += '</div>';
     html += '<div class="capture-list-actions">';
-    // View mode toggle (grid/list)
+    // 뷰 모드 전환 버튼 (그리드/목록)
     html += '<div class="capture-list-view-toggle">';
     html += `<button class="capture-list-view-mode-btn${viewMode === 'grid' ? ' active' : ''}" data-action="view-grid" title="Grid">`;
     html += '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>';
@@ -305,7 +304,7 @@ const CaptureList = (() => {
     html += '</div>';
     html += '</div>';
 
-    // Frame grid or list (collapsible)
+    // 프레임 그리드 또는 목록 (접이식)
     if (isExpanded) {
       if (viewMode === 'list') {
         html += '<div class="capture-list-rows">';
@@ -332,7 +331,7 @@ const CaptureList = (() => {
         });
         html += '</div>';
       } else {
-        // Grid view (default)
+        // 그리드 뷰 (기본값)
         html += '<div class="capture-list-grid">';
         currentSegments.forEach((seg, idx) => {
           const ts = seg.timestamp || '';
@@ -367,7 +366,7 @@ const CaptureList = (() => {
         html += '</div>';
       }
 
-      // Summary footer
+      // 요약 푸터
       html += '<div class="capture-list-footer">';
       html += `<span class="capture-list-video-title" title="${_escapeAttr(title)}">${_escapeHtml(_truncate(title, 50))}</span>`;
       html += '</div>';
@@ -377,16 +376,16 @@ const CaptureList = (() => {
 
     containerEl.innerHTML = html;
 
-    // Load actual thumbnails asynchronously
+    // 실제 썸네일 비동기 로드
     _loadThumbnails();
 
-    // Bind events
+    // 이벤트 바인딩
     _bindEvents();
   }
 
   /**
-   * Load actual thumbnail images from the asset protocol.
-   * Updates placeholder divs with actual <img> elements.
+   * asset protocol에서 실제 썸네일 이미지를 로드한다.
+   * 플레이스홀더 div를 실제 <img> 요소로 업데이트한다.
    */
   async function _loadThumbnails() {
     if (!containerEl || !currentVideoId) return;
@@ -394,7 +393,7 @@ const CaptureList = (() => {
     const placeholders = containerEl.querySelectorAll('.capture-list-thumb-placeholder[data-image]');
     if (placeholders.length === 0) return;
 
-    // Get the library path base for building asset URLs
+    // asset URL 생성을 위한 라이브러리 기본 경로 가져오기
     let libraryBasePath = null;
     if (window.__TAURI__ && window.__TAURI__.core) {
       try {
@@ -402,15 +401,15 @@ const CaptureList = (() => {
           videoId: currentVideoId
         });
         if (slidesPath) {
-          // Extract the directory containing slides.html
+          // slides.html이 포함된 디렉터리 추출
           libraryBasePath = slidesPath.replace(/[/\\]slides\.html$/, '');
         }
       } catch (e) {
-        // slides.html may not exist yet — try constructing from settings
+        // slides.html이 아직 없을 수 있음 — 백엔드에서 절대경로를 직접 받기
         try {
-          const settings = await window.__TAURI__.core.invoke('get_settings');
-          if (settings && settings.library_path) {
-            libraryBasePath = settings.library_path + '/' + currentVideoId;
+          const libPath = await window.__TAURI__.core.invoke('get_resolved_library_path');
+          if (libPath) {
+            libraryBasePath = libPath + '/' + currentVideoId;
           }
         } catch (e2) {
           console.warn('CaptureList: Cannot resolve library path for thumbnails');
@@ -420,7 +419,7 @@ const CaptureList = (() => {
 
     if (!libraryBasePath) return;
 
-    // Normalize path separators
+    // 경로 구분자 정규화
     const basePath = libraryBasePath.replace(/\\/g, '/');
 
     placeholders.forEach(placeholder => {
@@ -428,7 +427,7 @@ const CaptureList = (() => {
       if (!imageName) return;
 
       const imagePath = `${basePath}/images/${imageName}`;
-      // Build Tauri asset protocol URL
+      // Tauri asset protocol URL 생성
       const encodedPath = _percentEncodePath(imagePath);
       const assetUrl = `https://asset.localhost/${encodedPath}`;
 
@@ -438,11 +437,11 @@ const CaptureList = (() => {
       img.loading = 'lazy';
       img.src = assetUrl;
       img.onerror = function() {
-        // Keep the placeholder with frame number on error
+        // 오류 시 프레임 번호가 있는 플레이스홀더 유지
         this.style.display = 'none';
       };
 
-      // Keep the frame number badge
+      // 프레임 번호 배지 유지
       const badge = placeholder.querySelector('.capture-list-frame-num');
       placeholder.innerHTML = '';
       placeholder.appendChild(img);
@@ -453,7 +452,7 @@ const CaptureList = (() => {
   }
 
   /**
-   * Percent-encode a file path for use in an asset protocol URL.
+   * asset protocol URL에 사용하기 위해 파일 경로를 퍼센트 인코딩한다.
    * @param {string} pathStr
    * @returns {string}
    */
@@ -465,7 +464,7 @@ const CaptureList = (() => {
       } else if (ch === ' ') {
         encoded += '%20';
       } else {
-        // Encode each UTF-8 byte
+        // 각 UTF-8 바이트 인코딩
         const bytes = new TextEncoder().encode(ch);
         for (const b of bytes) {
           encoded += '%' + b.toString(16).toUpperCase().padStart(2, '0');
@@ -476,12 +475,12 @@ const CaptureList = (() => {
   }
 
   /**
-   * Bind click events to the rendered capture list.
+   * 렌더링된 캡쳐 목록에 클릭 이벤트를 바인딩한다.
    */
   function _bindEvents() {
     if (!containerEl) return;
 
-    // Toggle expand/collapse
+    // 접기/펼치기 토글
     containerEl.querySelectorAll('[data-action="toggle"]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -490,7 +489,7 @@ const CaptureList = (() => {
       });
     });
 
-    // View mode toggle (grid/list)
+    // 뷰 모드 전환 (그리드/목록)
     containerEl.querySelectorAll('[data-action="view-grid"]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -504,7 +503,7 @@ const CaptureList = (() => {
       });
     });
 
-    // View slides button — open in slides viewer
+    // 슬라이드 보기 버튼 — 슬라이드 뷰어에서 열기
     containerEl.querySelectorAll('[data-action="view-slides"]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -514,34 +513,34 @@ const CaptureList = (() => {
       });
     });
 
-    // Click on individual frames — open lightbox preview
+    // 개별 프레임 클릭 — 라이트박스 미리보기 열기
     const frameEls = containerEl.querySelectorAll('.capture-list-frame, .capture-list-row');
     frameEls.forEach(frame => {
       frame.addEventListener('click', () => {
         const frameIndex = parseInt(frame.dataset.frameIndex, 10);
         if (isNaN(frameIndex)) return;
 
-        // Dispatch event for other components
+        // 다른 컴포넌트를 위한 이벤트 발행
         document.dispatchEvent(new CustomEvent('captureListFrameClicked', {
           detail: { videoId: currentVideoId, frameIndex: frameIndex }
         }));
 
-        // Open lightbox preview
+        // 라이트박스 미리보기 열기
         _openLightbox(frameIndex);
       });
     });
   }
 
-  // ── Lightbox Preview ──────────────────────────────────────────
+  // ── 라이트박스 미리보기 ──────────────────────────────────────────
 
   /**
-   * Open the lightbox at the given frame index.
+   * 주어진 프레임 인덱스에서 라이트박스를 연다.
    */
   function _openLightbox(idx) {
     if (idx < 0 || idx >= currentSegments.length) return;
     lightboxIdx = idx;
 
-    // Create or find lightbox overlay
+    // 라이트박스 오버레이 찾기 또는 생성
     let overlay = document.getElementById('capture-lightbox');
     if (!overlay) {
       overlay = document.createElement('div');
@@ -567,7 +566,7 @@ const CaptureList = (() => {
       ].join('');
       document.body.appendChild(overlay);
 
-      // Bind lightbox events
+      // 라이트박스 이벤트 바인딩
       overlay.querySelector('.capture-lightbox-backdrop').addEventListener('click', _closeLightbox);
       overlay.querySelector('.capture-lightbox-close').addEventListener('click', _closeLightbox);
       overlay.querySelector('.capture-lightbox-prev').addEventListener('click', () => _navigateLightbox(-1));
@@ -618,7 +617,7 @@ const CaptureList = (() => {
     if (nextBtn) nextBtn.disabled = (lightboxIdx >= currentSegments.length - 1);
   }
 
-  // Keyboard navigation for lightbox
+  // 라이트박스 키보드 탐색
   document.addEventListener('keydown', (e) => {
     if (lightboxIdx < 0) return;
     switch (e.key) {
@@ -629,7 +628,7 @@ const CaptureList = (() => {
   });
 
   /**
-   * Get the capture mode label from the queue item.
+   * 큐 항목에서 캡쳐 모드 레이블을 가져온다.
    * @returns {string|null}
    */
   function _getCaptureMode() {
@@ -645,7 +644,7 @@ const CaptureList = (() => {
   }
 
   /**
-   * Clear/hide the capture list.
+   * 캡쳐 목록을 초기화/숨긴다.
    */
   function clear() {
     currentVideoId = null;
@@ -657,7 +656,7 @@ const CaptureList = (() => {
   }
 
   /**
-   * Check if the capture list is currently showing.
+   * 캡쳐 목록이 현재 표시 중인지 확인한다.
    * @returns {boolean}
    */
   function isVisible() {
@@ -665,14 +664,14 @@ const CaptureList = (() => {
   }
 
   /**
-   * Get the current video ID being displayed.
+   * 현재 표시 중인 영상 ID를 반환한다.
    * @returns {string|null}
    */
   function getVideoId() {
     return currentVideoId;
   }
 
-  // ── Utility helpers ──
+  // ── 유틸리티 헬퍼 함수 ──
 
   function _escapeHtml(str) {
     if (!str) return '';
@@ -692,7 +691,7 @@ const CaptureList = (() => {
     return str.substring(0, maxLen - 1) + '…';
   }
 
-  // ── Public API ──
+  // ── 공개 API ──
 
   return {
     init,

@@ -1,7 +1,7 @@
-//! YouTube video metadata fetching via yt-dlp --dump-json.
+//! yt-dlp --dump-json을 통한 YouTube 영상 메타데이터 조회 모듈.
 //!
-//! Provides a `VideoMetadata` struct and `fetch_metadata()` function
-//! that invokes yt-dlp to retrieve video information as JSON.
+//! yt-dlp를 호출해 영상 정보를 JSON으로 가져오는 `VideoMetadata` 구조체와
+//! `fetch_metadata()` 함수를 제공한다.
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -9,24 +9,24 @@ use std::process::Command;
 
 use crate::cmd_util::HideWindow;
 
-/// Core metadata for a YouTube video.
+/// YouTube 영상의 핵심 메타데이터.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VideoMetadata {
-    /// YouTube video ID (e.g. "dQw4w9WgXcQ").
+    /// YouTube 영상 ID (예: "dQw4w9WgXcQ").
     pub id: String,
-    /// Full video title.
+    /// 영상 전체 제목.
     pub title: String,
-    /// Channel name that uploaded the video.
+    /// 영상을 업로드한 채널명.
     pub channel: String,
-    /// Duration in seconds (may include fractional seconds).
+    /// 재생 시간(초, 소수점 포함 가능).
     pub duration: f64,
-    /// Upload date in YYYYMMDD format (e.g. "20091025").
+    /// 업로드 날짜(YYYYMMDD 형식, 예: "20091025").
     pub upload_date: String,
 }
 
-/// Raw JSON shape returned by `yt-dlp --dump-json`.
+/// `yt-dlp --dump-json`이 반환하는 원시 JSON 형식.
 ///
-/// Only the fields we care about are listed; serde ignores the rest.
+/// 필요한 필드만 나열하며, 나머지는 serde가 무시한다.
 #[derive(Deserialize)]
 struct YtDlpJson {
     id: String,
@@ -41,20 +41,20 @@ struct YtDlpJson {
     upload_date: Option<String>,
 }
 
-/// Resolve the path to the yt-dlp executable.
+/// yt-dlp 실행 파일 경로를 반환한다.
 ///
-/// Search order:
-/// 1. `tools/yt-dlp.exe` next to the executable (managed by tools_manager).
-/// 2. `yt-dlp.exe` directly next to the executable (portable/legacy).
-/// 3. System PATH fallback.
+/// 탐색 순서:
+/// 1. 실행 파일 옆의 `tools/yt-dlp.exe` (tools_manager가 관리).
+/// 2. 실행 파일 바로 옆의 `yt-dlp.exe` (포터블/레거시).
+/// 3. 시스템 PATH 폴백.
 pub fn resolve_ytdlp_path() -> PathBuf {
     crate::tools_manager::resolve_ytdlp_path()
 }
 
-/// Fetch metadata for a YouTube video URL using yt-dlp.
+/// yt-dlp로 YouTube 영상 URL의 메타데이터를 가져온다.
 ///
-/// Runs `yt-dlp --dump-json --no-playlist <url>` and parses the JSON output
-/// into a [`VideoMetadata`] struct. Returns an error string on failure.
+/// `yt-dlp --dump-json --no-playlist <url>`을 실행하고 JSON 출력을
+/// [`VideoMetadata`] 구조체로 파싱한다. 실패 시 오류 문자열을 반환한다.
 pub fn fetch_metadata(url: &str) -> Result<VideoMetadata, String> {
     let ytdlp_path = resolve_ytdlp_path();
 
@@ -79,7 +79,7 @@ pub fn fetch_metadata(url: &str) -> Result<VideoMetadata, String> {
     parse_metadata_json(&stdout)
 }
 
-/// Parse the JSON output of `yt-dlp --dump-json` into [`VideoMetadata`].
+/// `yt-dlp --dump-json`의 JSON 출력을 [`VideoMetadata`]로 파싱한다.
 pub fn parse_metadata_json(json: &str) -> Result<VideoMetadata, String> {
     let raw: YtDlpJson =
         serde_json::from_str(json).map_err(|e| format!("Failed to parse yt-dlp JSON: {e}"))?;

@@ -1,27 +1,29 @@
 /**
- * Settings UI module for framepick
- * Wires the settings modal to Tauri backend commands:
- *   - get_settings: load current config from config.json
- *   - update_settings: persist changes to config.json
- *   - validate_settings: check tool availability and paths
- *   - reset_settings: restore all defaults
- * Uses Tauri dialog plugin for native folder picker.
+ * @file settings.js
+ * @description framepick 설정 UI 모듈
+ *
+ * 설정 모달을 Tauri 백엔드 명령과 연결한다:
+ *   - get_settings: config.json에서 현재 설정 로드
+ *   - update_settings: config.json에 변경사항 저장
+ *   - validate_settings: 도구 가용성 및 경로 확인
+ *   - reset_settings: 모든 설정을 기본값으로 복원
+ * 네이티브 폴더 선택기를 위해 Tauri dialog 플러그인을 사용한다.
  */
 
 const SettingsUI = (() => {
-  // DOM references (resolved on init)
+  // DOM 참조 (init에서 결정됨)
   let modal, btnOpen, btnClose, btnCancel, btnSave, btnBrowse, btnReset;
   let inputLibraryPath, selectQuality, selectLanguage, checkboxMp4;
-  // Capture mode controls
+  // 캡쳐 모드 컨트롤
   let selectCaptureMode, inputInterval, rangeThreshold, thresholdValueEl;
   let intervalGroup;
 
-  // Snapshot of settings when modal opens (for cancel/revert)
+  // 모달 열릴 때의 설정 스냅샷 (취소/되돌리기용)
   let snapshot = null;
   let settingsLoaded = false;
 
   /**
-   * Initialize the settings UI. Call once after DOMContentLoaded.
+   * 설정 UI를 초기화한다. DOMContentLoaded 후 한 번 호출한다.
    */
   function init() {
     modal = document.getElementById('settings-modal');
@@ -36,7 +38,7 @@ const SettingsUI = (() => {
     selectLanguage = document.getElementById('settings-language');
     checkboxMp4 = document.getElementById('settings-mp4-retention');
 
-    // Capture mode controls
+    // 캡쳐 모드 컨트롤
     selectCaptureMode = document.getElementById('settings-capture-mode');
     inputInterval = document.getElementById('settings-interval');
     intervalGroup = document.getElementById('settings-interval-group');
@@ -48,7 +50,7 @@ const SettingsUI = (() => {
       return;
     }
 
-    // Bind events
+    // 이벤트 바인딩
     btnOpen.addEventListener('click', openModal);
     btnClose.addEventListener('click', closeModal);
     btnCancel.addEventListener('click', closeModal);
@@ -62,26 +64,26 @@ const SettingsUI = (() => {
       btnReset.addEventListener('click', handleReset);
     }
 
-    // Capture mode → show/hide interval group
+    // 캡쳐 모드 변경 → 간격 그룹 표시/숨김
     if (selectCaptureMode) {
       selectCaptureMode.addEventListener('change', function() {
         toggleIntervalVisibility();
       });
     }
 
-    // Threshold slider → update value display
+    // 임계값 슬라이더 → 값 표시 업데이트
     if (rangeThreshold && thresholdValueEl) {
       rangeThreshold.addEventListener('input', function() {
         thresholdValueEl.textContent = rangeThreshold.value + '%';
       });
     }
 
-    // Close on overlay click
+    // 오버레이 클릭 시 닫기
     modal.addEventListener('click', function(e) {
       if (e.target === modal) closeModal();
     });
 
-    // Close on Escape key
+    // Escape 키로 닫기
     document.addEventListener('keydown', function(e) {
       if (e.key === 'Escape' && !modal.hidden) {
         e.preventDefault();
@@ -89,24 +91,24 @@ const SettingsUI = (() => {
       }
     });
 
-    // Load initial settings from backend on app startup
+    // 앱 시작 시 백엔드에서 초기 설정 로드
     loadFromBackend();
   }
 
-  /** Show/hide the interval input based on selected capture mode */
+  /** 선택된 캡쳐 모드에 따라 간격 입력 필드를 표시/숨긴다 */
   function toggleIntervalVisibility() {
     if (!selectCaptureMode || !intervalGroup) return;
     var isInterval = selectCaptureMode.value === 'interval';
     intervalGroup.style.display = isInterval ? 'block' : 'none';
   }
 
-  // ── Tauri invoke helpers ──────────────────────────────────
+  // ── Tauri invoke 헬퍼 ──────────────────────────────────
 
   function tauriInvoke(cmd, args) {
     if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
       return window.__TAURI__.core.invoke(cmd, args);
     }
-    // Dev fallback with mock data
+    // 개발 환경 폴백 (목 데이터 사용)
     console.warn('[SettingsUI] Tauri not available, using mock for:', cmd);
     return Promise.resolve(mockInvoke(cmd, args));
   }
@@ -142,7 +144,7 @@ const SettingsUI = (() => {
     return null;
   }
 
-  // ── Settings load/apply ──────────────────────────────────
+  // ── 설정 로드/적용 ──────────────────────────────────
 
   async function loadFromBackend() {
     try {
@@ -150,7 +152,7 @@ const SettingsUI = (() => {
       applyToForm(settings);
       settingsLoaded = true;
 
-      // Sync the header language selector with persisted language
+      // 헤더 언어 선택기를 저장된 언어와 동기화
       if (settings.language) {
         var langSelect = document.getElementById('lang-select');
         if (langSelect && langSelect.value !== settings.language) {
@@ -161,7 +163,7 @@ const SettingsUI = (() => {
         }
       }
 
-      // Sync capture mode on dashboard with saved default
+      // 저장된 기본값으로 대시보드 캡쳐 모드 동기화
       if (settings.default_capture_mode && typeof setCaptureModeConfig === 'function') {
         setCaptureModeConfig(
           settings.default_capture_mode,
@@ -180,7 +182,7 @@ const SettingsUI = (() => {
     if (selectLanguage) selectLanguage.value = s.language || 'ko';
     if (checkboxMp4) checkboxMp4.checked = !!s.mp4_retention;
 
-    // Capture mode defaults
+    // 캡쳐 모드 기본값
     if (selectCaptureMode) selectCaptureMode.value = s.default_capture_mode || 'subtitle';
     if (inputInterval) inputInterval.value = s.default_interval_seconds || 30;
     if (rangeThreshold) {
@@ -205,21 +207,21 @@ const SettingsUI = (() => {
     };
   }
 
-  // ── System info loading ────────────────────────────────────
+  // ── 시스템 정보 로드 ────────────────────────────────────
 
   async function loadSystemInfo() {
     try {
       var result = await tauriInvoke('validate_settings');
       if (!result) return;
 
-      // Config path
+      // 설정 파일 경로
       var configPathEl = document.getElementById('settings-config-path-value');
       if (configPathEl) {
         configPathEl.textContent = result.config_path || '—';
         configPathEl.title = result.config_path || '';
       }
 
-      // ffmpeg status
+      // ffmpeg 상태
       var ffmpegEl = document.getElementById('settings-ffmpeg-status');
       if (ffmpegEl) {
         var ffLabel = result.ffmpeg_found
@@ -229,7 +231,7 @@ const SettingsUI = (() => {
         ffmpegEl.innerHTML = '<span class="settings-tool-badge ' + ffClass + '">' + ffLabel + '</span>';
       }
 
-      // yt-dlp status
+      // yt-dlp 상태
       var ytdlpEl = document.getElementById('settings-ytdlp-status');
       if (ytdlpEl) {
         var ytLabel = result.ytdlp_found
@@ -243,10 +245,10 @@ const SettingsUI = (() => {
     }
   }
 
-  // ── Modal open/close ──────────────────────────────────────
+  // ── 모달 열기/닫기 ──────────────────────────────────────
 
   async function openModal() {
-    // Refresh from backend before showing
+    // 표시 전 백엔드에서 새로고침
     try {
       var settings = await tauriInvoke('get_settings');
       applyToForm(settings);
@@ -254,22 +256,22 @@ const SettingsUI = (() => {
       console.error('[SettingsUI] Refresh failed:', err);
     }
 
-    // Take snapshot for cancel/revert
+    // 취소/되돌리기용 스냅샷 저장
     snapshot = readFromForm();
     modal.hidden = false;
     modal.setAttribute('aria-hidden', 'false');
 
-    // Load system info (non-blocking)
+    // 시스템 정보 로드 (비차단)
     loadSystemInfo();
 
-    // Focus the save button for accessibility
+    // 접근성을 위해 저장 버튼에 포커스
     setTimeout(function() {
       if (btnBrowse) btnBrowse.focus();
     }, 60);
   }
 
   function closeModal() {
-    // Revert form to snapshot if user cancelled
+    // 취소 시 스냅샷으로 폼 되돌리기
     if (snapshot) {
       applyToForm(snapshot);
     }
@@ -278,12 +280,12 @@ const SettingsUI = (() => {
     snapshot = null;
   }
 
-  // ── Save ──────────────────────────────────────────────────
+  // ── 저장 ──────────────────────────────────────────────────
 
   async function handleSave() {
     var patch = readFromForm();
 
-    // Validate interval
+    // 간격값 유효성 검사
     if (patch.default_capture_mode === 'interval') {
       var iv = patch.default_interval_seconds;
       if (isNaN(iv) || iv < 1 || iv > 3600) {
@@ -295,7 +297,7 @@ const SettingsUI = (() => {
       }
     }
 
-    // Visual feedback on save button
+    // 저장 버튼 시각적 피드백
     btnSave.disabled = true;
     var originalText = btnSave.textContent;
     btnSave.textContent = (typeof t === 'function' ? t('settings_saving') : null) || '저장 중...';
@@ -304,7 +306,7 @@ const SettingsUI = (() => {
       var updated = await tauriInvoke('update_settings', { patch: patch });
       applyToForm(updated);
 
-      // If language changed, apply globally
+      // 언어가 변경된 경우 전역으로 적용
       var newLang = updated.language || patch.language;
       if (newLang && typeof getLanguage === 'function' && newLang !== getLanguage()) {
         if (typeof setLanguage === 'function') {
@@ -314,7 +316,7 @@ const SettingsUI = (() => {
         if (langSelect) langSelect.value = newLang;
       }
 
-      // Sync capture mode on dashboard with new defaults
+      // 새 기본값으로 대시보드 캡쳐 모드 동기화
       if (updated.default_capture_mode && typeof setCaptureModeConfig === 'function') {
         setCaptureModeConfig(
           updated.default_capture_mode,
@@ -322,12 +324,12 @@ const SettingsUI = (() => {
         );
       }
 
-      // Dispatch settingsChanged event for other components
+      // 다른 컴포넌트를 위한 settingsChanged 이벤트 발행
       document.dispatchEvent(new CustomEvent('settingsChanged', {
         detail: updated
       }));
 
-      // Clear snapshot so close doesn't revert
+      // 닫을 때 되돌리지 않도록 스냅샷 초기화
       snapshot = null;
       modal.hidden = true;
       modal.setAttribute('aria-hidden', 'true');
@@ -344,7 +346,7 @@ const SettingsUI = (() => {
     }
   }
 
-  // ── Reset to defaults ──────────────────────────────────────
+  // ── 기본값으로 초기화 ──────────────────────────────────────
 
   async function handleReset() {
     var confirmMsg = (typeof t === 'function' ? t('settings_reset_confirm') : null) ||
@@ -355,7 +357,7 @@ const SettingsUI = (() => {
       var defaults = await tauriInvoke('reset_settings');
       applyToForm(defaults);
 
-      // Update snapshot so cancel doesn't revert to old values
+      // 취소 시 이전 값으로 되돌리지 않도록 스냅샷 업데이트
       snapshot = readFromForm();
 
       showToast(
@@ -367,21 +369,21 @@ const SettingsUI = (() => {
     }
   }
 
-  // ── Folder picker ─────────────────────────────────────────
+  // ── 폴더 선택기 ─────────────────────────────────────────
 
   async function browseFolder() {
     var selected = null;
 
     try {
       if (window.__TAURI__ && window.__TAURI__.dialog) {
-        // Tauri v2 dialog plugin
+        // Tauri v2 dialog 플러그인
         selected = await window.__TAURI__.dialog.open({
           directory: true,
           multiple: false,
           title: (typeof t === 'function' ? t('settings_select_folder') : null) || '라이브러리 폴더 선택',
         });
       } else if (window.__TAURI__ && window.__TAURI__.core) {
-        // Alternative: invoke plugin directly
+        // 대안: 플러그인 직접 호출
         selected = await window.__TAURI__.core.invoke('plugin:dialog|open', {
           options: {
             directory: true,
@@ -390,7 +392,7 @@ const SettingsUI = (() => {
           }
         });
       } else {
-        // Dev fallback: prompt
+        // 개발 환경 폴백: prompt 사용
         selected = prompt(
           (typeof t === 'function' ? t('settings_enter_path') : null) || '폴더 경로를 입력하세요:',
           inputLibraryPath ? inputLibraryPath.value : './library'
@@ -398,7 +400,7 @@ const SettingsUI = (() => {
       }
     } catch (err) {
       console.error('[SettingsUI] Folder picker error:', err);
-      // Fallback to prompt on error
+      // 오류 시 prompt로 폴백
       selected = prompt(
         (typeof t === 'function' ? t('settings_enter_path') : null) || '폴더 경로를 입력하세요:',
         inputLibraryPath ? inputLibraryPath.value : './library'
@@ -410,16 +412,16 @@ const SettingsUI = (() => {
     }
   }
 
-  // ── Toast notification ────────────────────────────────────
+  // ── 토스트 알림 ────────────────────────────────────────
 
   function showToast(message, type) {
-    // Use global showToast if available (from app.js)
+    // 전역 showToast가 있으면 사용 (app.js에서)
     if (typeof window.showToast === 'function' && window.showToast !== showToast) {
       window.showToast(message, type || 'success');
       return;
     }
 
-    // Remove any existing toast
+    // 기존 토스트 제거
     var existing = document.querySelector('.toast');
     if (existing) existing.remove();
 
@@ -428,12 +430,12 @@ const SettingsUI = (() => {
     toast.textContent = message;
     document.body.appendChild(toast);
 
-    // Trigger show animation
+    // 표시 애니메이션 트리거
     requestAnimationFrame(function() {
       toast.classList.add('toast-show');
     });
 
-    // Auto-dismiss after 2.5s
+    // 2.5초 후 자동 닫기
     setTimeout(function() {
       toast.classList.remove('toast-show');
       setTimeout(function() {
@@ -442,7 +444,7 @@ const SettingsUI = (() => {
     }, 2500);
   }
 
-  // ── Public API ────────────────────────────────────────────
+  // ── 공개 API ────────────────────────────────────────────
 
   return {
     init: init,
@@ -452,7 +454,7 @@ const SettingsUI = (() => {
   };
 })();
 
-// Legacy compat: expose as global functions for app.js
+// 하위 호환성: app.js용 전역 함수로 노출
 function initSettings() { SettingsUI.init(); }
 function openSettingsModal() { SettingsUI.openModal(); }
 function closeSettingsModal() {

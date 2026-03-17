@@ -1,9 +1,18 @@
 /**
- * FramePick - Application State Management
+ * @file state.js
+ * @description FramePick 앱의 글로벌 상태 관리 (AppState 싱글턴)
  *
- * Central state store for URL input, capture mode, and queue items.
- * Provides reactive updates via a simple pub/sub pattern so that
- * UI components and the Tauri backend stay in sync.
+ * URL 입력, 캡쳐 모드, 큐 항목에 대한 중앙 상태 저장소.
+ * 간단한 pub/sub 패턴을 통해 반응형 업데이트를 제공하여
+ * UI 컴포넌트와 Tauri 백엔드가 동기화 상태를 유지한다.
+ *
+ * 공개 API:
+ *  - on/off: 상태 키 변경 구독/해제
+ *  - get/getAll: 상태값 조회
+ *  - setUrl/setCaptureMode/setIntervalSeconds/setLanguage: 상태 설정
+ *  - addToQueue/updateQueueItem/removeQueueItem/clearFinishedItems: 큐 관리
+ *  - isValidYouTubeUrl: URL 유효성 검사
+ *  - buildPipelineInput: 백엔드 파이프라인 입력 페이로드 생성
  */
 
 const AppState = (() => {
@@ -102,8 +111,8 @@ const AppState = (() => {
   let _nextId = 1;
 
   /**
-   * Add a new item to the processing queue.
-   * Returns the created queue item or null if URL is empty.
+   * 처리 큐에 새 항목을 추가한다.
+   * 생성된 큐 항목을 반환하며, URL이 비어있으면 null을 반환한다.
    */
   function addToQueue(url, captureMode, intervalSeconds) {
     if (!url) return null;
@@ -152,8 +161,8 @@ const AppState = (() => {
   }
 
   /**
-   * Build the input payload object for the download/capture pipeline.
-   * This is what gets sent to the Tauri backend.
+   * 다운로드/캡쳐 파이프라인의 입력 페이로드 객체를 생성한다.
+   * Tauri 백엔드로 전송되는 데이터이다.
    */
   function buildPipelineInput() {
     return {

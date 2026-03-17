@@ -1,22 +1,25 @@
 /**
- * url-input.js - YouTube URL input field component with validation
+ * @file url-input.js
+ * @description YouTube URL 입력 필드 컴포넌트 (유효성 검사 포함)
  *
- * Provides real-time client-side validation with visual feedback,
- * plus backend validation via Tauri command before queue submission.
+ * 역할:
+ *  - 실시간 클라이언트 측 URL 유효성 검사 및 시각적 피드백 제공
+ *  - 대기열 제출 전 Tauri 백엔드 명령을 통한 서버 측 검증
+ *  - 단일 영상 URL 및 재생목록 URL 모두 지원
  */
 
 const UrlInput = (() => {
-  // YouTube URL patterns for client-side validation
+  // 클라이언트 측 유효성 검사용 YouTube URL 패턴
   const YOUTUBE_PATTERNS = [
-    // Standard watch URL: youtube.com/watch?v=VIDEO_ID
+    // 표준 시청 URL: youtube.com/watch?v=VIDEO_ID
     /^https?:\/\/(?:www\.)?youtube\.com\/watch\?(?:.*&)?v=([A-Za-z0-9_-]{11})(?:[&#]|$)/,
-    // Short URL: youtu.be/VIDEO_ID
+    // 단축 URL: youtu.be/VIDEO_ID
     /^https?:\/\/youtu\.be\/([A-Za-z0-9_-]{11})(?:[?&#/]|$)/,
-    // Embed URL: youtube.com/embed/VIDEO_ID
+    // 임베드 URL: youtube.com/embed/VIDEO_ID
     /^https?:\/\/(?:www\.)?youtube\.com\/embed\/([A-Za-z0-9_-]{11})(?:[?&#/]|$)/,
-    // Shorts URL: youtube.com/shorts/VIDEO_ID
+    // 쇼츠 URL: youtube.com/shorts/VIDEO_ID
     /^https?:\/\/(?:www\.)?youtube\.com\/shorts\/([A-Za-z0-9_-]{11})(?:[?&#/]|$)/,
-    // Mobile URL: m.youtube.com/watch?v=VIDEO_ID
+    // 모바일 URL: m.youtube.com/watch?v=VIDEO_ID
     /^https?:\/\/m\.youtube\.com\/watch\?(?:.*&)?v=([A-Za-z0-9_-]{11})(?:[&#]|$)/,
   ];
 
@@ -27,8 +30,8 @@ const UrlInput = (() => {
   let lastValidationResult = null;
 
   /**
-   * Initialize the URL input component.
-   * Binds event listeners and creates feedback element.
+   * URL 입력 컴포넌트를 초기화한다.
+   * 이벤트 리스너를 바인딩하고 피드백 요소를 생성한다.
    */
   function init() {
     inputEl = document.getElementById('url-input');
@@ -39,27 +42,27 @@ const UrlInput = (() => {
       return;
     }
 
-    // Create validation feedback element
+    // 유효성 검사 피드백 요소 생성
     feedbackEl = document.createElement('div');
     feedbackEl.className = 'url-feedback';
     feedbackEl.setAttribute('role', 'status');
     feedbackEl.setAttribute('aria-live', 'polite');
     inputEl.parentElement.insertBefore(feedbackEl, inputEl.nextSibling);
 
-    // Wrap the input in a container for positioning the feedback
+    // 피드백 위치 지정을 위한 입력 컨테이너 래핑
     _wrapInputGroup();
 
-    // Bind events
+    // 이벤트 바인딩
     inputEl.addEventListener('input', _onInput);
     inputEl.addEventListener('paste', _onPaste);
     inputEl.addEventListener('keydown', _onKeyDown);
     startBtn.addEventListener('click', _onStartClick);
 
-    // Initial state: disable start button
+    // 초기 상태: 시작 버튼 비활성화
     startBtn.disabled = true;
     lastValidationResult = null;
 
-    // Listen for language changes to update feedback text
+    // 언어 변경 시 피드백 텍스트 업데이트
     document.addEventListener('languageChanged', () => {
       if (lastValidationResult !== null) {
         _showFeedback(lastValidationResult.valid, lastValidationResult.messageKey);
@@ -68,26 +71,26 @@ const UrlInput = (() => {
   }
 
   /**
-   * Restructure DOM to support feedback positioning.
+   * 피드백 위치 지정을 지원하기 위해 DOM 구조를 재구성한다.
    */
   function _wrapInputGroup() {
     const group = inputEl.closest('.url-input-group');
     if (group && feedbackEl) {
-      // Move feedback outside the flex row, below the input group
+      // 피드백을 flex 행 밖으로 이동하여 입력 그룹 아래에 배치
       group.parentElement.insertBefore(feedbackEl, group.nextSibling);
     }
   }
 
-  // Playlist URL patterns (no video ID required)
+  // 재생목록 URL 패턴 (영상 ID 불필요)
   const PLAYLIST_PATTERNS = [
     /^https?:\/\/(?:www\.)?youtube\.com\/playlist\?(?:.*&)?list=([A-Za-z0-9_-]+)/,
     /^https?:\/\/m\.youtube\.com\/playlist\?(?:.*&)?list=([A-Za-z0-9_-]+)/,
   ];
 
   /**
-   * Client-side YouTube URL validation.
-   * Accepts both single video URLs and playlist URLs.
-   * @param {string} url
+   * 클라이언트 측 YouTube URL 유효성 검사.
+   * 단일 영상 URL과 재생목록 URL 모두 허용한다.
+   * @param {string} url - 검사할 URL
    * @returns {{ valid: boolean, videoId: string|null, isPlaylist: boolean }}
    */
   function validateClientSide(url) {
@@ -96,7 +99,7 @@ const UrlInput = (() => {
       return { valid: false, videoId: null, empty: true, isPlaylist: false };
     }
 
-    // Check single video patterns first
+    // 단일 영상 패턴 먼저 검사
     for (const pattern of YOUTUBE_PATTERNS) {
       const match = trimmed.match(pattern);
       if (match && match[1]) {
@@ -104,7 +107,7 @@ const UrlInput = (() => {
       }
     }
 
-    // Check playlist-only patterns (no video ID in URL)
+    // 재생목록 전용 패턴 검사 (URL에 영상 ID 없음)
     for (const pattern of PLAYLIST_PATTERNS) {
       const match = trimmed.match(pattern);
       if (match && match[1]) {
@@ -116,8 +119,8 @@ const UrlInput = (() => {
   }
 
   /**
-   * Backend validation via Tauri command.
-   * @param {string} url
+   * Tauri 명령을 통한 백엔드 URL 유효성 검사.
+   * @param {string} url - 검사할 URL
    * @returns {Promise<{valid: boolean, video_id: string, error: string}>}
    */
   async function validateBackend(url) {
@@ -126,7 +129,7 @@ const UrlInput = (() => {
         return await window.__TAURI__.core.invoke('validate_youtube_url', { url });
       } catch (err) {
         console.warn('Backend validation failed, using client-side only:', err);
-        // Fallback to client-side
+        // 백엔드 실패 시 클라이언트 측 검사로 폴백
         const result = validateClientSide(url);
         return {
           valid: result.valid,
@@ -135,7 +138,7 @@ const UrlInput = (() => {
         };
       }
     }
-    // No Tauri available (e.g., dev mode in browser)
+    // Tauri 미사용 환경 (브라우저 개발 모드 등)
     const result = validateClientSide(url);
     return {
       valid: result.valid,
@@ -145,18 +148,18 @@ const UrlInput = (() => {
   }
 
   /**
-   * Handle input event with debounced validation.
+   * 디바운스 처리된 유효성 검사와 함께 입력 이벤트를 처리한다.
    */
   function _onInput() {
     clearTimeout(debounceTimer);
     const value = inputEl.value.trim();
 
-    // Sync to AppState
+    // AppState에 URL 동기화
     if (typeof AppState !== 'undefined') {
       AppState.setUrl(value);
     }
 
-    // Clear feedback immediately when empty
+    // 입력값이 비어있으면 즉시 피드백 초기화
     if (!value) {
       _clearFeedback();
       startBtn.disabled = true;
@@ -165,7 +168,7 @@ const UrlInput = (() => {
       return;
     }
 
-    // Quick client-side check with debounce
+    // 디바운스 처리된 클라이언트 측 빠른 검사
     debounceTimer = setTimeout(() => {
       const result = validateClientSide(value);
       if (result.valid) {
@@ -177,10 +180,10 @@ const UrlInput = (() => {
   }
 
   /**
-   * Handle paste event - validate immediately without debounce.
+   * 붙여넣기 이벤트를 처리한다. 디바운스 없이 즉시 유효성을 검사한다.
    */
   function _onPaste(e) {
-    // Use setTimeout to get the pasted value after it's applied
+    // setTimeout으로 붙여넣기 완료 후 값을 가져옴
     setTimeout(() => {
       clearTimeout(debounceTimer);
       const value = inputEl.value.trim();
@@ -207,7 +210,7 @@ const UrlInput = (() => {
   }
 
   /**
-   * Handle Enter key to trigger start.
+   * Enter 키 입력 시 시작 동작을 트리거한다.
    */
   function _onKeyDown(e) {
     if (e.key === 'Enter' && !startBtn.disabled) {
@@ -217,23 +220,23 @@ const UrlInput = (() => {
   }
 
   /**
-   * Handle start button click - perform full validation then dispatch event.
+   * 시작 버튼 클릭을 처리한다. 전체 유효성 검사 후 urlSubmitted 이벤트를 발행한다.
    */
   async function _onStartClick() {
     const url = inputEl.value.trim();
     if (!url) return;
 
-    // Disable button during validation
+    // 유효성 검사 중 버튼 비활성화
     startBtn.disabled = true;
     startBtn.textContent = t('url_validating');
 
     try {
-      // Check client-side first — handles both single videos and playlists
+      // 클라이언트 측 먼저 검사 — 단일 영상과 재생목록 모두 처리
       const clientResult = validateClientSide(url);
 
       if (clientResult.valid) {
-        // Dispatch custom event with validated URL and video ID
-        // For playlist URLs, videoId may be null — app.js will detect and open playlist modal
+        // 검증된 URL과 영상 ID로 커스텀 이벤트 발행
+        // 재생목록 URL의 경우 videoId가 null일 수 있음 — app.js가 감지하여 재생목록 모달을 열어줌
         document.dispatchEvent(new CustomEvent('urlSubmitted', {
           detail: {
             url: url,
@@ -242,7 +245,7 @@ const UrlInput = (() => {
           }
         }));
 
-        // Clear input after successful submission
+        // 제출 성공 후 입력 필드 초기화
         inputEl.value = '';
         if (typeof AppState !== 'undefined') {
           AppState.setUrl('');
@@ -252,7 +255,7 @@ const UrlInput = (() => {
         lastValidationResult = null;
         startBtn.disabled = true;
       } else {
-        // Try backend validation as fallback for edge cases
+        // 엣지 케이스 처리를 위해 백엔드 검증으로 폴백
         const result = await validateBackend(url);
         if (result.valid) {
           document.dispatchEvent(new CustomEvent('urlSubmitted', {
@@ -286,7 +289,7 @@ const UrlInput = (() => {
   }
 
   /**
-   * Set visual valid state.
+   * 유효한 URL 상태의 시각적 표시를 설정한다.
    */
   function _setValidState(videoId) {
     inputEl.classList.remove('url-invalid');
@@ -297,7 +300,7 @@ const UrlInput = (() => {
   }
 
   /**
-   * Set visual invalid state.
+   * 유효하지 않은 URL 상태의 시각적 표시를 설정한다.
    */
   function _setInvalidState(errorMsg) {
     inputEl.classList.remove('url-valid');
@@ -308,7 +311,7 @@ const UrlInput = (() => {
   }
 
   /**
-   * Show validation feedback message.
+   * 유효성 검사 피드백 메시지를 표시한다.
    */
   function _showFeedback(isValid, messageKey) {
     if (!feedbackEl) return;
@@ -317,7 +320,7 @@ const UrlInput = (() => {
   }
 
   /**
-   * Clear validation feedback.
+   * 유효성 검사 피드백을 초기화한다.
    */
   function _clearFeedback() {
     if (!feedbackEl) return;
@@ -326,15 +329,15 @@ const UrlInput = (() => {
   }
 
   /**
-   * Get the current URL value.
-   * @returns {string}
+   * 현재 입력 필드의 URL 값을 반환한다.
+   * @returns {string} 현재 URL 값
    */
   function getValue() {
     return inputEl ? inputEl.value.trim() : '';
   }
 
   /**
-   * Reset the input to empty state.
+   * 입력 필드를 초기 빈 상태로 되돌린다.
    */
   function reset() {
     if (inputEl) {

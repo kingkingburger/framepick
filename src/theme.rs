@@ -1,133 +1,132 @@
-//! Shared dark theme constants for framepick.
+//! framepick 공유 다크 테마 (글래스모피즘 + 민트 그린)
 //!
-//! These values mirror `src-ui/theme.css` so that generated HTML
-//! files (slides.html) use the same visual language as the Tauri app UI.
-//! When updating the theme, change both this file and `theme.css`.
+//! 이 값들은 `frontend/css/theme.css`와 동기화되어야 한다.
+//! 생성되는 slides.html에 임베딩되어 Tauri 앱과 동일한 테마를 적용.
 
-// ── Background colors ──
+// ── 배경 색상 ──
 
-pub const BG_BODY: &str = "#1a1a2e";
-pub const BG_SIDEBAR: &str = "#16213e";
-pub const BG_SURFACE: &str = "#0f3460";
-pub const BG_CARD: &str = "#1e293b";
-pub const BG_INPUT: &str = "#0f172a";
+pub const BG_BODY: &str = "#0f172a";
+pub const BG_SIDEBAR: &str = "rgba(15, 23, 42, 0.85)";
+pub const BG_SURFACE: &str = "rgba(30, 41, 59, 0.6)";
+pub const BG_CARD: &str = "rgba(15, 23, 42, 0.7)";
+pub const BG_INPUT: &str = "rgba(15, 23, 42, 0.8)";
 pub const BG_OVERLAY: &str = "rgba(0, 0, 0, 0.78)";
 pub const BG_OVERLAY_LIGHT: &str = "rgba(0, 0, 0, 0.6)";
-pub const BG_HOVER: &str = "#2d3a50";
-pub const BG_ACTIVE: &str = "#334155";
+pub const BG_HOVER: &str = "rgba(30, 41, 59, 0.5)";
+pub const BG_ACTIVE: &str = "rgba(16, 185, 129, 0.1)";
 pub const BG_IMAGE: &str = "#000";
 pub const BG_SCROLLBAR_TRACK: &str = "transparent";
-pub const BG_SCROLLBAR_THUMB: &str = "#333";
-pub const BG_SCROLLBAR_THUMB_HOVER: &str = "#555";
+pub const BG_SCROLLBAR_THUMB: &str = "rgba(148, 163, 184, 0.2)";
+pub const BG_SCROLLBAR_THUMB_HOVER: &str = "rgba(148, 163, 184, 0.35)";
 
-// ── Text colors ──
+// ── 텍스트 색상 ──
 
 pub const TEXT_PRIMARY: &str = "#e2e8f0";
 pub const TEXT_SECONDARY: &str = "#94a3b8";
-pub const TEXT_HINT: &str = "#7a7a94";
-pub const TEXT_MUTED: &str = "#64748b";
-pub const TEXT_HEADING: &str = "#ffffff";
-pub const TEXT_BODY: &str = "#d4d4d4";
-pub const TEXT_META: &str = "#888";
-pub const TEXT_FOOTER: &str = "#444";
+pub const TEXT_HINT: &str = "#64748b";
+pub const TEXT_MUTED: &str = "#475569";
+pub const TEXT_HEADING: &str = "#f1f5f9";
+pub const TEXT_BODY: &str = "#cbd5e1";
+pub const TEXT_META: &str = "#64748b";
+pub const TEXT_FOOTER: &str = "#334155";
 
-// ── Accent colors ──
+// ── 액센트 색상 (민트 그린) ──
 
-pub const ACCENT: &str = "#3b82f6";
-pub const ACCENT_HOVER: &str = "#2563eb";
-pub const ACCENT_LIGHT: &str = "#60a5fa";
-pub const ACCENT_SUBTLE: &str = "rgba(59, 130, 246, 0.12)";
+pub const ACCENT: &str = "#10b981";
+pub const ACCENT_HOVER: &str = "#34d399";
+pub const ACCENT_LIGHT: &str = "#6ee7b7";
+pub const ACCENT_SUBTLE: &str = "rgba(16, 185, 129, 0.12)";
 
-// ── Border colors ──
+// ── 테두리 색상 ──
 
-pub const BORDER: &str = "#334155";
-pub const BORDER_FOCUS: &str = "#3b82f6";
-pub const BORDER_SUBTLE: &str = "#1e293b";
+pub const BORDER: &str = "rgba(148, 163, 184, 0.12)";
+pub const BORDER_FOCUS: &str = "#10b981";
+pub const BORDER_SUBTLE: &str = "rgba(148, 163, 184, 0.06)";
 
-// ── Shadows ──
+// ── 그림자 ──
 
 pub const SHADOW: &str = "rgba(0, 0, 0, 0.3)";
-pub const SHADOW_CARD: &str = "0 2px 12px rgba(0, 0, 0, 0.5)";
-pub const SHADOW_CARD_HOVER: &str = "0 4px 24px rgba(59, 130, 246, 0.12)";
-pub const SHADOW_TOGGLE: &str = "0 2px 12px rgba(59, 130, 246, 0.4)";
+pub const SHADOW_CARD: &str = "0 4px 16px rgba(0, 0, 0, 0.25)";
+pub const SHADOW_CARD_HOVER: &str = "0 8px 32px rgba(16, 185, 129, 0.15)";
+pub const SHADOW_TOGGLE: &str = "0 2px 12px rgba(16, 185, 129, 0.4)";
 
-// ── Border radius ──
+// ── 테두리 반경 ──
 
-pub const RADIUS: &str = "8px";
-pub const RADIUS_SM: &str = "4px";
-pub const RADIUS_LG: &str = "12px";
+pub const RADIUS: &str = "12px";
+pub const RADIUS_SM: &str = "6px";
+pub const RADIUS_LG: &str = "16px";
 
-// ── Typography ──
+// ── 타이포그래피 ──
 
 pub const FONT_FAMILY: &str =
     "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif";
 pub const FONT_MONO: &str = "'JetBrains Mono', 'Fira Code', 'Consolas', monospace";
 
-// ── Transition ──
+// ── 전환 ──
 
 pub const TRANSITION: &str = "0.2s ease";
-pub const TRANSITION_FAST: &str = "0.18s ease";
+pub const TRANSITION_FAST: &str = "0.15s ease";
 
-/// Returns the theme as a CSS `:root` block with `--fp-*` custom properties.
+/// CSS `:root` 블록을 반환한다. `--fp-*` 커스텀 프로퍼티 포함.
 ///
-/// This is intended to be embedded in standalone HTML files (e.g. slides.html)
-/// so they share the same theme as the Tauri app without needing an external
-/// CSS file.  Values here MUST match `src-ui/theme.css`.
+/// slides.html 등 독립 HTML 파일에 임베딩하여
+/// Tauri 앱과 동일한 테마를 적용한다.
+/// 값은 반드시 `frontend/css/theme.css`와 일치해야 함.
 pub fn css_variables_block() -> &'static str {
     r#":root {
-  --fp-bg-primary: #1a1a2e;
-  --fp-bg-secondary: #16213e;
-  --fp-bg-card: #1e293b;
-  --fp-bg-input: #0f172a;
-  --fp-bg-hover: #2d3a50;
-  --fp-bg-active: #334155;
-  --fp-bg-surface: #0f3460;
+  --fp-bg-primary: #0f172a;
+  --fp-bg-secondary: rgba(15, 23, 42, 0.85);
+  --fp-bg-card: rgba(15, 23, 42, 0.7);
+  --fp-bg-input: rgba(15, 23, 42, 0.8);
+  --fp-bg-hover: rgba(30, 41, 59, 0.5);
+  --fp-bg-active: rgba(16, 185, 129, 0.1);
+  --fp-bg-surface: rgba(30, 41, 59, 0.6);
   --fp-bg-overlay: rgba(0, 0, 0, 0.78);
   --fp-bg-overlay-light: rgba(0, 0, 0, 0.6);
   --fp-bg-image: #000;
-  --fp-bg-deep: #111;
-  --fp-bg-deepest: #0f0f0f;
+  --fp-bg-deep: #020617;
+  --fp-bg-deepest: #010409;
   --fp-bg-scrollbar-track: transparent;
-  --fp-bg-scrollbar-thumb: #333;
-  --fp-bg-scrollbar-thumb-hover: #555;
+  --fp-bg-scrollbar-thumb: rgba(148, 163, 184, 0.2);
+  --fp-bg-scrollbar-thumb-hover: rgba(148, 163, 184, 0.35);
   --fp-text-primary: #e2e8f0;
   --fp-text-secondary: #94a3b8;
-  --fp-text-muted: #64748b;
-  --fp-text-heading: #ffffff;
-  --fp-text-body: #d4d4d4;
-  --fp-text-hint: #7a7a94;
-  --fp-text-meta: #888;
-  --fp-text-footer: #444;
+  --fp-text-muted: #475569;
+  --fp-text-heading: #f1f5f9;
+  --fp-text-body: #cbd5e1;
+  --fp-text-hint: #64748b;
+  --fp-text-meta: #64748b;
+  --fp-text-footer: #334155;
   --fp-text-on-accent: #fff;
-  --fp-accent: #3b82f6;
-  --fp-accent-hover: #2563eb;
-  --fp-accent-light: #60a5fa;
-  --fp-accent-dim: rgba(59, 130, 246, 0.15);
-  --fp-accent-subtle: rgba(59, 130, 246, 0.12);
-  --fp-accent-glow: rgba(59, 130, 246, 0.15);
-  --fp-accent-bg: rgba(59, 130, 246, 0.08);
-  --fp-accent-bg-faint: rgba(59, 130, 246, 0.05);
-  --fp-accent-bg-light: rgba(59, 130, 246, 0.1);
-  --fp-accent-focus-ring: rgba(59, 130, 246, 0.15);
-  --fp-accent-focus-ring-strong: rgba(59, 130, 246, 0.25);
-  --fp-accent-shadow: rgba(59, 130, 246, 0.3);
-  --fp-accent-border: rgba(59, 130, 246, 0.6);
-  --fp-accent-solid: rgba(59, 130, 246, 0.85);
-  --fp-border: #334155;
-  --fp-border-focus: #3b82f6;
-  --fp-border-subtle: #1e293b;
-  --fp-border-translucent: rgba(51, 65, 85, 0.4);
-  --fp-border-solid-bg: rgba(51, 65, 85, 0.85);
-  --fp-border-solid-bg-full: rgba(51, 65, 85, 1);
+  --fp-accent: #10b981;
+  --fp-accent-hover: #34d399;
+  --fp-accent-light: #6ee7b7;
+  --fp-accent-dim: rgba(16, 185, 129, 0.15);
+  --fp-accent-subtle: rgba(16, 185, 129, 0.12);
+  --fp-accent-glow: rgba(16, 185, 129, 0.15);
+  --fp-accent-bg: rgba(16, 185, 129, 0.08);
+  --fp-accent-bg-faint: rgba(16, 185, 129, 0.05);
+  --fp-accent-bg-light: rgba(16, 185, 129, 0.1);
+  --fp-accent-focus-ring: rgba(16, 185, 129, 0.15);
+  --fp-accent-focus-ring-strong: rgba(16, 185, 129, 0.25);
+  --fp-accent-shadow: rgba(16, 185, 129, 0.3);
+  --fp-accent-border: rgba(16, 185, 129, 0.6);
+  --fp-accent-solid: rgba(16, 185, 129, 0.85);
+  --fp-border: rgba(148, 163, 184, 0.12);
+  --fp-border-focus: #10b981;
+  --fp-border-subtle: rgba(148, 163, 184, 0.06);
+  --fp-border-translucent: rgba(148, 163, 184, 0.08);
+  --fp-border-solid-bg: rgba(30, 41, 59, 0.85);
+  --fp-border-solid-bg-full: rgba(30, 41, 59, 1);
   --fp-shadow: rgba(0, 0, 0, 0.3);
   --fp-shadow-deep: rgba(0, 0, 0, 0.4);
-  --fp-shadow-card: 0 2px 12px rgba(0, 0, 0, 0.5);
-  --fp-shadow-card-hover: 0 4px 24px rgba(59, 130, 246, 0.12);
-  --fp-shadow-toggle: 0 2px 12px rgba(59, 130, 246, 0.4);
+  --fp-shadow-card: 0 4px 16px rgba(0, 0, 0, 0.25);
+  --fp-shadow-card-hover: 0 8px 32px rgba(16, 185, 129, 0.15);
+  --fp-shadow-toggle: 0 2px 12px rgba(16, 185, 129, 0.4);
   --fp-shadow-footer: rgba(0, 0, 0, 0.1);
-  --fp-radius: 8px;
-  --fp-radius-sm: 4px;
-  --fp-radius-lg: 12px;
+  --fp-radius: 12px;
+  --fp-radius-sm: 6px;
+  --fp-radius-lg: 16px;
   --fp-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
   --fp-font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
   --fp-font-size-xs: 0.7rem;
@@ -135,7 +134,7 @@ pub fn css_variables_block() -> &'static str {
   --fp-font-size-base: 0.95rem;
   --fp-font-size-lg: 1rem;
   --fp-transition: 0.2s ease;
-  --fp-transition-fast: 0.18s ease;
+  --fp-transition-fast: 0.15s ease;
   --fp-spacing-xs: 4px;
   --fp-spacing-sm: 8px;
   --fp-spacing-md: 16px;
@@ -154,11 +153,16 @@ pub fn css_variables_block() -> &'static str {
   --fp-overlay: rgba(0, 0, 0, 0.6);
   --fp-overlay-heavy: rgba(0, 0, 0, 0.78);
   --fp-overlay-light: rgba(0, 0, 0, 0.75);
-  --fp-neutral-tint: rgba(148, 163, 184, 0.15);
-  --fp-neutral-tint-light: rgba(148, 163, 184, 0.12);
-  --fp-neutral-tint-border: rgba(148, 163, 184, 0.3);
-  --fp-info-bg: rgba(106, 153, 255, 0.15);
+  --fp-neutral-tint: rgba(148, 163, 184, 0.1);
+  --fp-neutral-tint-light: rgba(148, 163, 184, 0.06);
+  --fp-neutral-tint-border: rgba(148, 163, 184, 0.15);
+  --fp-info-bg: rgba(56, 189, 248, 0.12);
   --fp-select-arrow: #94a3b8;
+  --fp-glass-bg: rgba(255, 255, 255, 0.04);
+  --fp-glass-bg-strong: rgba(255, 255, 255, 0.07);
+  --fp-glass-border: rgba(255, 255, 255, 0.08);
+  --fp-glass-blur: 12px;
+  --fp-glass-blur-strong: 20px;
 }"#
 }
 
@@ -211,17 +215,18 @@ mod tests {
         assert!(css.contains("--fp-success:"));
         assert!(css.contains("--fp-error:"));
         assert!(css.contains("--fp-warning:"));
+        // Glassmorphism tokens
+        assert!(css.contains("--fp-glass-bg:"));
+        assert!(css.contains("--fp-glass-blur:"));
     }
 
     #[test]
     fn constants_match_css_variables_block() {
         let css = css_variables_block();
-        // Verify key constants match the CSS block values
         assert!(css.contains(BG_BODY));
-        assert!(css.contains(BG_SIDEBAR));
         assert!(css.contains(TEXT_PRIMARY));
         assert!(css.contains(ACCENT));
-        assert!(css.contains(BORDER));
+        assert!(css.contains(BORDER_FOCUS));
         assert!(css.contains(RADIUS));
         assert!(css.contains(FONT_MONO));
     }

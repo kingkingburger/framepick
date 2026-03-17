@@ -1,9 +1,8 @@
-//! Capture mode fallback logic.
+//! 캡쳐 모드 자동 전환(폴백) 로직.
 //!
-//! When the user selects "subtitle" capture mode, this module checks whether
-//! the target video actually has downloadable subtitles. If not, it automatically
-//! falls back to "scene" (scene-change detection) mode and notifies the frontend
-//! via a Tauri event so the user sees a toast/log entry explaining the switch.
+//! 사용자가 "subtitle" 캡쳐 모드를 선택했을 때, 대상 영상에 실제로
+//! 다운로드 가능한 자막이 있는지 확인한다. 없으면 자동으로 "scene"
+//! (장면 전환 감지) 모드로 전환하고, Tauri 이벤트로 프론트엔드에 알린다.
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
@@ -11,31 +10,31 @@ use tauri::{AppHandle, Emitter};
 use crate::subtitle_detector::{check_subtitles, SubtitleCheckResult};
 use crate::subtitle_extractor::{select_best_subtitle_language, SubtitleLanguageSelection};
 
-/// The resolved capture mode after fallback logic has been applied.
+/// 폴백 로직 적용 후 결정된 실제 캡쳐 모드.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResolvedCaptureMode {
-    /// The capture mode that will actually be used ("subtitle", "scene", or "interval").
+    /// 실제로 사용될 캡쳐 모드 ("subtitle", "scene", "interval" 중 하나).
     pub effective_mode: String,
-    /// The mode originally requested by the user.
+    /// 사용자가 원래 요청한 모드.
     pub requested_mode: String,
-    /// Whether a fallback occurred (requested != effective).
+    /// 폴백이 발생했는지 여부 (요청 모드 != 실제 모드).
     pub did_fallback: bool,
-    /// Human-readable reason for the fallback (empty if no fallback).
+    /// 폴백 사유 (폴백 없으면 빈 문자열).
     pub fallback_reason: String,
-    /// i18n key for the fallback reason (empty if no fallback).
-    /// The frontend uses this to display a localized notification.
+    /// 폴백 사유 i18n 키 (폴백 없으면 빈 문자열).
+    /// 프론트엔드가 현지화된 알림을 표시할 때 사용한다.
     pub fallback_reason_key: String,
-    /// Subtitle check result (only populated when subtitle mode was requested).
+    /// 자막 확인 결과 (subtitle 모드가 요청된 경우에만 채워짐).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subtitle_check: Option<SubtitleCheckResult>,
-    /// Selected subtitle language (only populated when subtitle mode is confirmed).
-    /// Prioritizes Korean, then English, then any other available language.
+    /// 선택된 자막 언어 (subtitle 모드가 확정된 경우에만 채워짐).
+    /// 한국어 → 영어 → 기타 순으로 우선순위를 적용한다.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub selected_language: Option<SubtitleLanguageSelection>,
 }
 
 impl ResolvedCaptureMode {
-    /// No fallback needed — use the requested mode as-is.
+    /// 폴백 없음 — 요청된 모드를 그대로 사용한다.
     fn no_fallback(mode: &str) -> Self {
         Self {
             effective_mode: mode.to_string(),
@@ -48,7 +47,7 @@ impl ResolvedCaptureMode {
         }
     }
 
-    /// Subtitle mode with confirmed subtitle availability and selected language.
+    /// 자막 가용성이 확인되고 언어가 선택된 subtitle 모드.
     fn subtitle_confirmed(check: SubtitleCheckResult, lang: SubtitleLanguageSelection) -> Self {
         Self {
             effective_mode: "subtitle".to_string(),
@@ -61,7 +60,7 @@ impl ResolvedCaptureMode {
         }
     }
 
-    /// Fallback from subtitle to scene-change mode.
+    /// subtitle에서 장면 전환 모드로 폴백한다.
     fn fallback_to_scene(reason: &str, reason_key: &str, check: SubtitleCheckResult) -> Self {
         Self {
             effective_mode: "scene".to_string(),
@@ -75,31 +74,30 @@ impl ResolvedCaptureMode {
     }
 }
 
-/// Tauri event payload emitted when a capture mode fallback occurs.
+/// 캡쳐 모드 폴백이 발생했을 때 발송되는 Tauri 이벤트 페이로드.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FallbackEvent {
-    /// Queue item ID (if applicable, 0 for pre-queue resolution).
+    /// 큐 항목 ID (큐 처리 전 해결 시에는 0).
     pub queue_id: u32,
-    /// The video URL being processed.
+    /// 처리 중인 영상 URL.
     pub url: String,
-    /// The mode the user originally requested.
+    /// 사용자가 원래 요청한 모드.
     pub requested_mode: String,
-    /// The mode that will actually be used.
+    /// 실제로 사용될 모드.
     pub effective_mode: String,
-    /// i18n key for the fallback reason.
+    /// 폴백 사유 i18n 키.
     pub reason_key: String,
-    /// Fallback reason in English (for logging).
+    /// 로깅용 폴백 사유 (영어).
     pub reason: String,
 }
 
-/// Resolve the effective capture mode for a video.
+/// 영상의 실제 캡쳐 모드를 결정한다.
 ///
-/// For "subtitle" mode, this checks subtitle availability and falls back to
-/// "scene" mode if no subtitles are found. For "scene" and "interval" modes,
-/// the requested mode is returned unchanged.
+/// "subtitle" 모드의 경우 자막 가용성을 확인하고, 자막이 없으면
+/// "scene" 모드로 폴백한다. "scene"과 "interval" 모드는 그대로 반환된다.
 ///
-/// This function is blocking — it shells out to yt-dlp. Callers should run
-/// it on a background thread (e.g., via `tokio::task::spawn_blocking`).
+/// 이 함수는 블로킹 — yt-dlp를 호출한다. 호출자는 백그라운드 스레드에서
+/// 실행해야 한다 (예: `tokio::task::spawn_blocking`).
 pub fn resolve_capture_mode(video_url: &str, requested_mode: &str) -> ResolvedCaptureMode {
     match requested_mode {
         "subtitle" => resolve_subtitle_mode(video_url),
@@ -111,7 +109,7 @@ pub fn resolve_capture_mode(video_url: &str, requested_mode: &str) -> ResolvedCa
     }
 }
 
-/// Check subtitle availability and decide whether to fall back to scene mode.
+/// 자막 가용성을 확인하고 scene 모드로 폴백할지 결정한다.
 fn resolve_subtitle_mode(video_url: &str) -> ResolvedCaptureMode {
     println!("[capture_fallback] Checking subtitle availability for: {}", video_url);
 
@@ -165,10 +163,10 @@ fn resolve_subtitle_mode(video_url: &str) -> ResolvedCaptureMode {
     }
 }
 
-/// Emit a fallback event to the frontend via Tauri's event system.
+/// Tauri 이벤트 시스템을 통해 폴백 이벤트를 프론트엔드에 발송한다.
 ///
-/// The frontend listens for `capture:fallback` events to show a toast notification
-/// informing the user that their capture mode was automatically changed.
+/// 프론트엔드는 `capture:fallback` 이벤트를 수신해 캡쳐 모드가
+/// 자동으로 변경됐음을 알리는 토스트 알림을 표시한다.
 pub fn emit_fallback_event(
     app: &AppHandle,
     queue_id: u32,
@@ -193,12 +191,12 @@ pub fn emit_fallback_event(
     }
 }
 
-/// Tauri command: resolve the effective capture mode for a given video URL.
+/// Tauri 커맨드: 주어진 영상 URL의 실제 캡쳐 모드를 결정한다.
 ///
-/// This is called by the frontend before (or at the start of) pipeline processing
-/// to determine whether subtitle mode can be used or needs to fall back.
+/// 파이프라인 처리 전(또는 시작 시) 프론트엔드가 호출하여
+/// subtitle 모드 사용 가능 여부 또는 폴백 필요 여부를 판단한다.
 ///
-/// The command runs yt-dlp on a background thread to avoid blocking the UI.
+/// UI 블로킹 방지를 위해 yt-dlp를 백그라운드 스레드에서 실행한다.
 #[tauri::command]
 pub async fn resolve_capture_mode_cmd(
     url: String,

@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e1b4b"/>
+    </linearGradient>
+    <linearGradient id="mint" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="100%" stop-color="#10b981"/>
+    </linearGradient>
+  </defs>
+  <!-- 배경 -->
+  <rect width="256" height="256" rx="48" fill="url(#bg)"/>
+  <!-- 필름 프레임 외곽 -->
+  <rect x="40" y="56" width="176" height="144" rx="12" fill="none" stroke="url(#mint)" stroke-width="6"/>
+  <!-- 왼쪽 퍼포레이션 -->
+  <rect x="50" y="68" width="12" height="10" rx="2" fill="#10b981" opacity="0.5"/>
+  <rect x="50" y="88" width="12" height="10" rx="2" fill="#10b981" opacity="0.5"/>
+  <rect x="50" y="108" width="12" height="10" rx="2" fill="#10b981" opacity="0.5"/>
+  <rect x="50" y="128" width="12" height="10" rx="2" fill="#10b981" opacity="0.5"/>
+  <rect x="50" y="148" width="12" height="10" rx="2" fill="#10b981" opacity="0.5"/>
+  <rect x="50" y="168" width="12" height="10" rx="2" fill="#10b981" opacity="0.5"/>
+  <!-- 오른쪽 퍼포레이션 -->
+  <rect x="194" y="68" width="12" height="10" rx="2" fill="#10b981" opacity="0.5"/>
+  <rect x="194" y="88" width="12" height="10" rx="2" fill="#10b981" opacity="0.5"/>
+  <rect x="194" y="108" width="12" height="10" rx="2" fill="#10b981" opacity="0.5"/>
+  <rect x="194" y="128" width="12" height="10" rx="2" fill="#10b981" opacity="0.5"/>
+  <rect x="194" y="148" width="12" height="10" rx="2" fill="#10b981" opacity="0.5"/>
+  <rect x="194" y="168" width="12" height="10" rx="2" fill="#10b981" opacity="0.5"/>
+  <!-- 중앙 스크린 영역 -->
+  <rect x="72" y="68" width="112" height="120" rx="6" fill="rgba(16,185,129,0.08)" stroke="rgba(16,185,129,0.2)" stroke-width="1"/>
+  <!-- 재생 삼각형 (캡쳐 심볼) -->
+  <polygon points="116,108 144,128 116,148" fill="url(#mint)" opacity="0.9"/>
+  <!-- 프레임 격자선 (캡쳐 포인트) -->
+  <line x1="72" y1="128" x2="184" y2="128" stroke="#10b981" stroke-width="1" opacity="0.2"/>
+  <line x1="128" y1="68" x2="128" y2="188" stroke="#10b981" stroke-width="1" opacity="0.2"/>
+</svg>

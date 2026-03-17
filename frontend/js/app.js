@@ -1,9 +1,39 @@
 /**
- * framepick - Main application entry point
+ * @file app.js
+ * @description framepick 앱의 메인 진입점
+ *
+ * 역할:
+ *  - DOMContentLoaded 시 모든 UI 컴포넌트 초기화
+ *  - yt-dlp / ffmpeg 자동 다운로드(도구 설치) 오버레이 처리
+ *  - URL 입력 → 대기열 추가 플로우 제어
+ *  - 재생목록 URL 감지 → PlaylistUI 연동
+ *  - 라이브러리 항목 로드 및 렌더링
+ *  - 토스트 알림, 재캡쳐 모달, 삭제 확인 모달 관리
+ *  - 언어 전환 및 AppState와 백엔드 간 동기화
  */
 
 document.addEventListener('DOMContentLoaded', () => {
-  // ─── Tauri interop helper ──────────────────────────────────
+  // ─── 사이드바 토글 (모바일 반응형) ──────────────────────────
+  const sidebarEl = document.getElementById('app-sidebar');
+  const sidebarToggleBtn = document.getElementById('sidebar-toggle-btn');
+  if (sidebarToggleBtn && sidebarEl) {
+    sidebarToggleBtn.addEventListener('click', () => {
+      sidebarEl.classList.toggle('open');
+    });
+    // 메인 영역 클릭 시 사이드바 닫기 (모바일)
+    const appMain = document.querySelector('.app-main');
+    if (appMain) {
+      appMain.addEventListener('click', (e) => {
+        if (window.innerWidth <= 768 && sidebarEl.classList.contains('open')) {
+          if (!e.target.closest('.sidebar-toggle-btn')) {
+            sidebarEl.classList.remove('open');
+          }
+        }
+      });
+    }
+  }
+
+  // ─── Tauri interop 헬퍼 ────────────────────────────────────
   const invoke = (cmd, args) => {
     if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
       return window.__TAURI__.core.invoke(cmd, args);
@@ -12,7 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return Promise.resolve(null);
   };
 
-  // ─── Tools setup (auto-download yt-dlp + ffmpeg) ───────────
+  // ─── 도구 설치 (yt-dlp + ffmpeg 자동 다운로드) ─────────────
   const toolsOverlay = document.getElementById('tools-setup-overlay');
   const toolsMessage = document.getElementById('tools-setup-message');
   const toolsProgressFill = document.getElementById('tools-progress-fill');
@@ -27,16 +57,16 @@ document.addEventListener('DOMContentLoaded', () => {
   async function runToolsSetup() {
     if (!window.__TAURI__ || !window.__TAURI__.core) return;
 
-    // Listen to granular progress events from the backend
+    // 백엔드에서 보내는 세부 진행 이벤트 수신
     let unlistenFn = null;
     if (window.__TAURI__.event && window.__TAURI__.event.listen) {
       unlistenFn = await window.__TAURI__.event.listen('tools:status', (event) => {
         const p = event.payload;
         if (!p) return;
 
-        // Map tool+status → progress percentage
+        // 도구별 진행률 매핑: yt-dlp 0~50%, ffmpeg 50~100%
         let pct = p.progress != null ? p.progress : 0;
-        // yt-dlp occupies 0–50%, ffmpeg 50–100%
+        // yt-dlp: 전체 진행 바의 앞 절반 담당
         if (p.tool === 'yt-dlp') {
           pct = Math.round(pct / 2);
         } else if (p.tool === 'ffmpeg') {
@@ -53,9 +83,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     try {
-      // Check whether any downloads are needed before showing overlay
-      // We do this by calling setup_tools; if all ready it returns quickly
-      // Show overlay immediately — hide once done
+      // setup_tools 호출: 이미 준비된 경우 빠르게 반환됨
+      // 오버레이를 즉시 표시하고 완료 후 숨김
       if (toolsOverlay) toolsOverlay.hidden = false;
       updateToolsOverlay(0, t('tools_setup_message'), t('tools_setup_checking'));
 
@@ -64,7 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (toolsOverlay) toolsOverlay.hidden = true;
 
-      // Check for yt-dlp updates in the background (non-blocking)
+      // 백그라운드에서 yt-dlp 업데이트 확인 (비차단)
       window.__TAURI__.core.invoke('check_ytdlp_update').then((info) => {
         if (info && info.update_available) {
           console.log('[tools] yt-dlp update available:', info.latest_version);
@@ -74,7 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (err) {
       console.error('[tools] Setup failed:', err);
       updateToolsOverlay(0, t('tools_setup_error', { error: String(err) }), '');
-      // Don't block the app — hide overlay after 4s even on error
+      // 오류 발생 시에도 앱을 차단하지 않음 — 4초 후 오버레이 자동 숨김
       setTimeout(() => {
         if (toolsOverlay) toolsOverlay.hidden = true;
       }, 4000);
@@ -85,7 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   runToolsSetup();
 
-  // ─── Initialize components ─────────────────────────────────
+  // ─── 컴포넌트 초기화 ───────────────────────────────────────
   UrlInput.init();
   initCaptureMode();
   if (typeof SettingsUI !== 'undefined') {
@@ -99,8 +128,8 @@ document.addEventListener('DOMContentLoaded', () => {
   CaptureList.init();
   PlaylistUI.init();
 
-  // ─── Workflow empty hint visibility ────────────────────────
-  // Show hint when queue is empty and no captures are displayed
+  // ─── 워크플로우 빈 화면 안내 표시 ─────────────────────────
+  // 큐가 비어있고 캡쳐 목록도 없을 때 안내 문구 표시
   const workflowHint = document.getElementById('workflow-empty-hint');
   function updateWorkflowHint() {
     if (!workflowHint) return;
@@ -109,21 +138,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const hasCaptureList = typeof CaptureList !== 'undefined' && CaptureList.isVisible();
     workflowHint.classList.toggle('hidden', hasQueue || hasCaptureList);
   }
-  // Update hint on queue and capture list changes
+  // 큐 및 캡쳐 목록 변경 시 안내 문구 갱신
   document.addEventListener('queueItemAdded', updateWorkflowHint);
   document.addEventListener('queueItemCompleted', updateWorkflowHint);
   document.addEventListener('queueItemFailed', updateWorkflowHint);
   document.addEventListener('queueCleared', updateWorkflowHint);
-  // Initial state
+  // 초기 상태 설정
   updateWorkflowHint();
 
-  // ─── Queue completion → Library refresh bridge ─────────────────
-  // QueueUI handles Tauri events internally; we just refresh library on completion
+  // ─── 큐 완료 → 라이브러리 새로고침 연결 ───────────────────────
+  // QueueUI가 Tauri 이벤트를 내부적으로 처리하므로 완료 시 라이브러리만 새로고침
   document.addEventListener('queueItemCompleted', () => {
     loadLibrary();
   });
 
-  // ─── Language switcher in header ───────────────────────────
+  // ─── 헤더 언어 전환기 ──────────────────────────────────────
   const langSelect = document.getElementById('lang-select');
   langSelect.addEventListener('change', () => {
     const lang = langSelect.value;
@@ -133,7 +162,7 @@ document.addEventListener('DOMContentLoaded', () => {
       .catch(err => console.warn('Failed to persist language:', err));
   });
 
-  // Sync AppState language → header dropdown
+  // AppState 언어 변경 → 헤더 드롭다운 동기화
   AppState.on('language', (lang) => {
     if (langSelect.value !== lang) {
       langSelect.value = lang;
@@ -141,26 +170,26 @@ document.addEventListener('DOMContentLoaded', () => {
     setLanguage(lang);
   });
 
-  // Listen for validated URL submissions → add to queue (or open playlist modal)
+  // 검증된 URL 제출 이벤트 수신 → 대기열 추가 또는 재생목록 모달 열기
   document.addEventListener('urlSubmitted', (e) => {
     const { url, videoId } = e.detail;
 
-    // Check if this is a playlist URL
+    // 재생목록 URL 여부 확인
     const playlistCheck = PlaylistUI.detectPlaylist(url);
     if (playlistCheck.isPlaylist) {
-      // Open playlist selection modal instead of adding directly
+      // 단건 추가 대신 재생목록 선택 모달을 열어줌
       console.log('Playlist detected:', playlistCheck.listId);
       PlaylistUI.open(url, playlistCheck.listId);
       return;
     }
 
-    // Single video: check duplicate in local queue (by URL or video ID)
+    // 단일 영상: 로컬 대기열 내 중복 확인 (URL 또는 영상 ID 기준)
     const currentQueue = QueueUI.getQueue();
     const isDuplicateInQueue = currentQueue.some((q) => {
       if (q.status !== 'pending' && q.status !== 'processing') return false;
-      // Exact URL match
+      // URL 완전 일치
       if (q.url === url) return true;
-      // Video ID match (handles different URL formats for same video)
+      // 영상 ID 일치 (같은 영상의 다른 URL 형식 처리)
       if (videoId && q.videoId && q.videoId === videoId) return true;
       return false;
     });
@@ -169,7 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Check if video already exists in library (already processed) then add
+    // 라이브러리에 이미 처리된 영상인지 확인 후 대기열에 추가
     const checkAndAdd = async () => {
       if (videoId && window.__TAURI__ && window.__TAURI__.core) {
         try {
@@ -180,7 +209,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
           }
         } catch (err) {
-          // If check fails, proceed anyway — don't block the user
+          // 확인 실패 시에도 사용자를 차단하지 않고 진행
           console.warn('Failed to check video existence:', err);
         }
       }
@@ -190,7 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (id > 0) {
           showToast(t('queue_added'), 'success');
           console.log('Added to queue:', { id, url, videoId });
-          // Auto-scroll to make queue section visible
+          // 큐 섹션이 보이도록 자동 스크롤
           const queueSection = document.getElementById('queue-section');
           if (queueSection) {
             queueSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -204,10 +233,10 @@ document.addEventListener('DOMContentLoaded', () => {
     checkAndAdd();
   });
 
-  // ─── Playlist selection dialog → Queue bridge ────────────────
-  // When the user confirms video selections in the PlaylistUI dialog,
-  // add each selected video as an individual entry in the download queue.
-  // Videos are added sequentially to preserve ordering and avoid race conditions.
+  // ─── 재생목록 선택 다이얼로그 → 대기열 연결 ─────────────────
+  // 사용자가 PlaylistUI에서 영상을 선택·확인하면
+  // 각 영상을 개별 항목으로 다운로드 대기열에 추가.
+  // 순서 유지 및 경쟁 조건 방지를 위해 순차적으로 추가.
   document.addEventListener('playlistVideosSelected', (e) => {
     const { videos } = e.detail;
     if (!videos || videos.length === 0) return;
@@ -215,8 +244,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let addedCount = 0;
     let skippedCount = 0;
 
-    // Track URLs already in queue AND newly added within this batch
-    // to prevent intra-batch duplicates (e.g., same video appearing twice in playlist)
+    // 이미 대기열에 있는 URL과 이번 배치에서 새로 추가된 URL을 함께 추적
+    // 배치 내 중복 방지 (예: 같은 영상이 재생목록에 두 번 등장하는 경우)
     const activeUrls = new Set(
       QueueUI.getQueue()
         .filter(q => q.status === 'pending' || q.status === 'processing')
@@ -225,7 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const addNext = async (index) => {
       if (index >= videos.length) {
-        // Show summary toast when all videos have been processed
+        // 모든 영상 처리 완료 후 요약 토스트 표시
         if (addedCount > 0 && skippedCount > 0) {
           showToast(
             t('queue_added_partial', { added: addedCount, skipped: skippedCount }),
@@ -241,7 +270,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const video = videos[index];
 
-      // Skip duplicates (includes intra-batch duplicate detection via activeUrls Set)
+      // 중복 건너뜀 (activeUrls Set으로 배치 내 중복도 감지)
       if (activeUrls.has(video.url)) {
         skippedCount++;
         console.log('Skipping duplicate in queue:', video.url);
@@ -249,7 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      // Skip videos already in library (if backend is available)
+      // 라이브러리에 이미 있는 영상 건너뜀 (백엔드 사용 가능 시)
       if (video.videoId && window.__TAURI__ && window.__TAURI__.core) {
         try {
           const exists = await window.__TAURI__.core.invoke('check_video_exists', { videoId: video.videoId });
@@ -265,7 +294,7 @@ document.addEventListener('DOMContentLoaded', () => {
       QueueUI.addItem(video.url, video.videoId || '').then((id) => {
         if (id > 0) {
           addedCount++;
-          activeUrls.add(video.url); // Track to prevent intra-batch duplicates
+          activeUrls.add(video.url); // 배치 내 중복 방지를 위해 추적
           console.log('Added playlist video to queue:', {
             id,
             url: video.url,
@@ -284,13 +313,13 @@ document.addEventListener('DOMContentLoaded', () => {
     addNext(0);
   });
 
-  // Listen for capture mode changes → sync to backend
+  // 캡쳐 모드 변경 이벤트 수신 → 백엔드에 동기화
   document.addEventListener('captureModeChanged', (e) => {
     console.log('Capture mode config:', e.detail);
     invoke('set_input_state', { state: AppState.buildPipelineInput() }).catch(() => {});
   });
 
-  // Debounced URL sync to backend
+  // URL 변경 시 디바운스 처리 후 백엔드에 동기화
   let _urlSyncTimer = null;
   AppState.on('url', () => {
     clearTimeout(_urlSyncTimer);
@@ -299,15 +328,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 300);
   });
 
-  // Library refresh button
+  // 라이브러리 새로고침 버튼
   const refreshBtn = document.getElementById('btn-refresh-library');
   if (refreshBtn) {
     refreshBtn.addEventListener('click', () => loadLibrary());
   }
 
-  // ─── Listen for queue:duplicate-skipped events from backend ─────
-  // When the backend detects that a video already exists in the library
-  // during processing, it emits a queue:duplicate-skipped event.
+  // ─── 백엔드의 queue:duplicate-skipped 이벤트 수신 ──────────────
+  // 처리 중 라이브러리에 이미 존재하는 영상이 감지되면
+  // 백엔드에서 queue:duplicate-skipped 이벤트를 발행함.
   if (window.__TAURI__ && window.__TAURI__.event && window.__TAURI__.event.listen) {
     window.__TAURI__.event.listen('queue:duplicate-skipped', (event) => {
       const payload = event.payload;
@@ -316,22 +345,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // ─── Listen for capture:fallback events from backend ─────
-  // When the backend detects that subtitle mode can't be used (no subtitles
-  // available or subtitle check failed), it emits a capture:fallback event.
-  // We show a toast notification and log the fallback.
+  // ─── 백엔드의 capture:fallback 이벤트 수신 ─────────────────
+  // 자막 모드를 사용할 수 없을 때(자막 없음 또는 확인 실패)
+  // 백엔드에서 capture:fallback 이벤트를 발행함.
+  // 토스트 알림을 표시하고 폴백을 기록함.
   if (window.__TAURI__ && window.__TAURI__.event && window.__TAURI__.event.listen) {
     window.__TAURI__.event.listen('capture:fallback', (event) => {
       const payload = event.payload;
       console.log('[capture_fallback] Mode fallback occurred:', payload);
 
-      // Use the i18n key from the backend payload, or fall back to generic message
+      // 백엔드 페이로드의 i18n 키 사용, 없으면 기본 메시지로 폴백
       const reasonKey = payload.reason_key || 'fallback_no_subtitles';
       const message = t(reasonKey) || payload.reason || 'Capture mode changed';
 
       showToast(message, 'warning');
 
-      // Update the queue item's capture mode in local state if applicable
+      // 해당하는 경우 로컬 상태의 큐 항목 캡쳐 모드 업데이트
       if (payload.queue_id && payload.queue_id > 0) {
         AppState.updateQueueItem(payload.queue_id, {
           captureMode: payload.effective_mode,
@@ -340,15 +369,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Set initial language (will be overridden by settings if backend available)
+  // 초기 언어 설정 (백엔드 설정이 있으면 이후에 덮어씌워짐)
   setLanguage('ko');
 
-  // Load library on startup
+  // 앱 시작 시 라이브러리 로드
   loadLibrary();
 });
 
 /**
- * Load and display library entries from the backend.
+ * 백엔드에서 라이브러리 항목을 불러와 화면에 표시한다.
  */
 async function loadLibrary() {
   const grid = document.getElementById('library-grid');
@@ -361,7 +390,7 @@ async function loadLibrary() {
       entries = await window.__TAURI__.core.invoke('list_library_entries');
     }
 
-    // Update library count badge
+    // 라이브러리 항목 수 뱃지 업데이트
     if (countEl) {
       countEl.textContent = entries.length > 0
         ? t('library_item_count', { n: entries.length })
@@ -376,7 +405,7 @@ async function loadLibrary() {
     grid.innerHTML = entries.map(entry => {
       const title = entry.title || entry.video_id;
       const slideCount = entry.slide_count != null ? t('library_slides', { n: entry.slide_count }) : '';
-      // Use first captured frame as thumbnail; fall back to placeholder icon
+      // 첫 번째 캡쳐 프레임을 썸네일로 사용; 없으면 플레이스홀더 아이콘으로 대체
       const thumbHtml = entry.thumbnail
         ? `<img class="library-card-thumb" src="${escapeHtml(entry.thumbnail)}" alt="${escapeHtml(title)}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'library-card-thumb-placeholder\\'>&#9654;</div>'">`
         : `<div class="library-card-thumb-placeholder">&#9654;</div>`;
@@ -416,10 +445,10 @@ async function loadLibrary() {
       `;
     }).join('');
 
-    // Bind click events to open viewer
+    // 뷰어 열기 클릭 이벤트 바인딩
     grid.querySelectorAll('.library-card[data-video-id]').forEach(card => {
       card.addEventListener('click', (e) => {
-        // Don't open viewer if action button or overlay button was clicked
+        // 액션 버튼 또는 오버레이 버튼 클릭 시 뷰어 열지 않음
         if (e.target.closest('.library-card-action') || e.target.closest('.library-card-overlay-btn')) return;
         const videoId = card.dataset.videoId;
         if (videoId) {
@@ -428,7 +457,7 @@ async function loadLibrary() {
       });
     });
 
-    // Bind "Open in Viewer" overlay button events
+    // "뷰어에서 열기" 오버레이 버튼 이벤트 바인딩
     grid.querySelectorAll('.library-card-view').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -439,7 +468,7 @@ async function loadLibrary() {
       });
     });
 
-    // Bind "Open in Browser" overlay button events
+    // "브라우저에서 열기" 오버레이 버튼 이벤트 바인딩
     grid.querySelectorAll('.library-card-browser').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
@@ -457,7 +486,7 @@ async function loadLibrary() {
       });
     });
 
-    // Bind open-folder button events
+    // 폴더 열기 버튼 이벤트 바인딩
     grid.querySelectorAll('.library-card-open-folder').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
@@ -475,7 +504,7 @@ async function loadLibrary() {
       });
     });
 
-    // Bind re-capture button events
+    // 다시 캡쳐 버튼 이벤트 바인딩
     grid.querySelectorAll('.library-card-recapture').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -487,14 +516,14 @@ async function loadLibrary() {
       });
     });
 
-    // Bind delete button events
+    // 삭제 버튼 이벤트 바인딩
     grid.querySelectorAll('.library-card-delete').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const videoId = btn.dataset.deleteId;
         if (!videoId) return;
 
-        // Find the card's title for the confirmation dialog
+        // 확인 다이얼로그에 표시할 카드 제목 찾기
         const card = btn.closest('.library-card');
         const titleEl = card ? card.querySelector('.library-card-title') : null;
         const title = titleEl ? titleEl.textContent : videoId;
@@ -509,21 +538,21 @@ async function loadLibrary() {
 }
 
 /**
- * Show a toast notification with stacking support.
- * Multiple toasts stack upward so rapid failures don't overwrite each other.
- * Error toasts include an icon and a close button for better UX.
- * @param {string} message
- * @param {'success'|'error'|'warning'} type
+ * 스택 지원이 있는 토스트 알림을 표시한다.
+ * 여러 토스트가 위로 쌓여 빠른 연속 오류가 서로 덮어쓰지 않도록 한다.
+ * 오류 토스트는 아이콘과 닫기 버튼을 포함하여 UX를 개선한다.
+ * @param {string} message - 표시할 메시지
+ * @param {'success'|'error'|'warning'} type - 알림 유형
  */
 function showToast(message, type = 'success') {
-  // Toast icons for visual distinction
+  // 유형별 시각 구분을 위한 토스트 아이콘
   const TOAST_ICONS = {
     success: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
     error: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
     warning: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
   };
 
-  // Cap max visible toasts to 5 to prevent DOM overflow
+  // DOM 넘침 방지를 위해 최대 5개까지만 표시
   const existingToasts = document.querySelectorAll('.toast');
   if (existingToasts.length >= 5) {
     existingToasts[0].remove();
@@ -536,7 +565,7 @@ function showToast(message, type = 'success') {
   toast.innerHTML = `<span class="toast-icon">${iconHtml}</span><span class="toast-message">${safeMsg}</span><button class="toast-close" aria-label="Close">&times;</button>`;
   document.body.appendChild(toast);
 
-  // Close button allows manual dismissal
+  // 닫기 버튼으로 수동 닫기 가능
   toast.querySelector('.toast-close').addEventListener('click', () => {
     toast.classList.remove('toast-show');
     setTimeout(() => {
@@ -545,15 +574,15 @@ function showToast(message, type = 'success') {
     }, 300);
   });
 
-  // Reposition all visible toasts to stack upward
+  // 위로 쌓이도록 모든 토스트 위치 재조정
   _repositionToasts();
 
-  // Trigger show animation
+  // 표시 애니메이션 트리거
   requestAnimationFrame(() => {
     toast.classList.add('toast-show');
   });
 
-  // Error toasts stay longer (6s) so the user can read the error details
+  // 오류 토스트는 6초, 경고는 4초, 성공은 3초 유지
   const duration = type === 'error' ? 6000 : type === 'warning' ? 4000 : 3000;
   setTimeout(() => {
     toast.classList.remove('toast-show');
@@ -565,8 +594,8 @@ function showToast(message, type = 'success') {
 }
 
 /**
- * Reposition stacked toasts so they don't overlap.
- * Called whenever a toast is added or removed.
+ * 쌓인 토스트들이 겹치지 않도록 위치를 재조정한다.
+ * 토스트가 추가되거나 제거될 때마다 호출된다.
  */
 function _repositionToasts() {
   const toasts = document.querySelectorAll('.toast');
@@ -578,9 +607,9 @@ function _repositionToasts() {
 }
 
 /**
- * Simple HTML escape for safe attribute/content injection.
- * @param {string} str
- * @returns {string}
+ * 속성/컨텐츠 삽입 시 XSS 방지를 위한 HTML 이스케이프 함수.
+ * @param {string} str - 이스케이프할 문자열
+ * @returns {string} 이스케이프된 문자열
  */
 function escapeHtml(str) {
   const div = document.createElement('div');
@@ -588,14 +617,14 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// ─── Re-capture Modal ──────────────────────────────────────────
+// ─── 재캡쳐 모달 ───────────────────────────────────────────────
 
-/** Currently targeted video ID for re-capture */
+/** 현재 재캡쳐 대상 영상 ID */
 let _recaptureVideoId = null;
-/** Cached settings for re-capture (scene threshold, interval) */
+/** 재캡쳐용 캐시된 설정값 (장면 임계값, 간격 등) */
 let _recaptureSettings = null;
 
-/** Mode description i18n key mapping */
+/** 모드별 설명 i18n 키 매핑 */
 const RECAPTURE_MODE_DESC_KEYS = {
   subtitle: 'capture_mode_subtitle_desc',
   scene: 'capture_mode_scene_desc',
@@ -603,7 +632,7 @@ const RECAPTURE_MODE_DESC_KEYS = {
 };
 
 /**
- * Update the mode description text and show/hide mode-specific options.
+ * 재캡쳐 모달의 모드 설명 텍스트를 갱신하고 모드별 옵션을 표시/숨긴다.
  */
 function _updateRecaptureModeUI() {
   const modeSelect = document.getElementById('recapture-mode');
@@ -614,22 +643,22 @@ function _updateRecaptureModeUI() {
   if (!modeSelect) return;
   const mode = modeSelect.value;
 
-  // Update description text
+  // 설명 텍스트 업데이트
   if (descEl) {
     const descKey = RECAPTURE_MODE_DESC_KEYS[mode] || '';
     descEl.textContent = descKey ? t(descKey) : '';
     descEl.setAttribute('data-i18n', descKey);
   }
 
-  // Show/hide interval options
+  // 간격 옵션 표시/숨김
   if (intervalGroup) intervalGroup.hidden = mode !== 'interval';
-  // Show/hide scene threshold
+  // 장면 임계값 표시/숨김
   if (sceneGroup) sceneGroup.hidden = mode !== 'scene';
 }
 
 /**
- * Get the effective interval seconds from recapture modal (preset or custom).
- * @returns {number}
+ * 재캡쳐 모달에서 유효한 간격(초)을 반환한다. 프리셋 또는 직접 입력값 처리.
+ * @returns {number} 간격(초)
  */
 function _getRecaptureInterval() {
   const intervalSelect = document.getElementById('recapture-interval');
@@ -645,9 +674,9 @@ function _getRecaptureInterval() {
 }
 
 /**
- * Open the re-capture modal for a library item.
- * @param {string} videoId
- * @param {string} title
+ * 라이브러리 항목에 대한 재캡쳐 모달을 열고 초기 상태를 설정한다.
+ * @param {string} videoId - 대상 영상 ID
+ * @param {string} title - 영상 제목
  */
 async function openRecaptureModal(videoId, title) {
   const modal = document.getElementById('recapture-modal');
@@ -663,14 +692,14 @@ async function openRecaptureModal(videoId, title) {
 
   _recaptureVideoId = videoId;
 
-  // Reset state
+  // 상태 초기화
   if (titleEl) titleEl.textContent = title;
   if (modeSelect) modeSelect.value = 'subtitle';
   if (errorEl) { errorEl.hidden = true; errorEl.textContent = ''; }
   if (progressEl) progressEl.hidden = true;
   if (startBtn) { startBtn.disabled = false; startBtn.textContent = t('recapture_start'); }
 
-  // Load scene threshold from settings
+  // 설정에서 장면 임계값 로드
   try {
     if (window.__TAURI__ && window.__TAURI__.core) {
       _recaptureSettings = await window.__TAURI__.core.invoke('get_settings');
@@ -684,10 +713,10 @@ async function openRecaptureModal(videoId, title) {
     console.warn('Failed to load settings for recapture:', err);
   }
 
-  // Update mode-specific UI
+  // 모드별 UI 업데이트
   _updateRecaptureModeUI();
 
-  // Reset custom interval input
+  // 직접 입력 간격 필드 초기화
   const customIntervalGroup = document.getElementById('recapture-custom-interval-group');
   const customIntervalInput = document.getElementById('recapture-custom-interval');
   const intervalSelect = document.getElementById('recapture-interval');
@@ -695,7 +724,7 @@ async function openRecaptureModal(videoId, title) {
   if (customIntervalInput) customIntervalInput.value = '';
   if (intervalSelect) intervalSelect.value = '10';
 
-  // Check if source video is available
+  // 원본 영상 파일 사용 가능 여부 확인
   try {
     if (window.__TAURI__ && window.__TAURI__.core) {
       const available = await window.__TAURI__.core.invoke('check_recapture_available', { videoId });
@@ -715,7 +744,7 @@ async function openRecaptureModal(videoId, title) {
 }
 
 /**
- * Close the re-capture modal.
+ * 재캡쳐 모달을 닫고 상태를 초기화한다.
  */
 function closeRecaptureModal() {
   const modal = document.getElementById('recapture-modal');
@@ -724,7 +753,7 @@ function closeRecaptureModal() {
 }
 
 /**
- * Execute re-capture with selected mode.
+ * 선택된 캡쳐 모드로 재캡쳐를 실행한다.
  */
 async function executeRecapture() {
   if (!_recaptureVideoId) return;
@@ -741,7 +770,7 @@ async function executeRecapture() {
   const captureMode = modeSelect ? modeSelect.value : 'scene';
   const intervalSeconds = _getRecaptureInterval();
 
-  // Validate custom interval
+  // 직접 입력 간격 유효성 검사
   if (captureMode === 'interval') {
     const intervalSelect = document.getElementById('recapture-interval');
     if (intervalSelect && intervalSelect.value === 'custom') {
@@ -757,7 +786,7 @@ async function executeRecapture() {
     }
   }
 
-  // Disable button and show processing state
+  // 버튼 비활성화 및 처리 중 상태 표시
   if (startBtn) {
     startBtn.disabled = true;
     startBtn.textContent = t('recapture_processing');
@@ -765,7 +794,7 @@ async function executeRecapture() {
   if (cancelBtn) cancelBtn.disabled = true;
   if (errorEl) errorEl.hidden = true;
 
-  // Show progress indicator
+  // 진행 표시기 표시
   if (progressEl) progressEl.hidden = false;
   if (progressFill) {
     progressFill.style.width = '30%';
@@ -784,7 +813,7 @@ async function executeRecapture() {
       args.sceneThreshold = parseInt(thresholdSlider.value, 10) / 100.0;
     }
 
-    // Simulate progress stages
+    // 진행 단계 시뮬레이션
     if (progressFill) progressFill.style.width = '50%';
 
     let result = null;
@@ -795,7 +824,7 @@ async function executeRecapture() {
     if (progressFill) progressFill.style.width = '100%';
     if (progressText) progressText.textContent = t('progress_done');
 
-    // Brief pause to show completion
+    // 완료 상태를 잠깐 보여주기 위한 짧은 대기
     await new Promise(resolve => setTimeout(resolve, 400));
 
     closeRecaptureModal();
@@ -806,7 +835,7 @@ async function executeRecapture() {
       showToast(t('recapture_success', { n: '?' }), 'success');
     }
 
-    // Refresh library to show updated thumbnails/counts
+    // 업데이트된 썸네일/개수 표시를 위해 라이브러리 새로고침
     loadLibrary();
   } catch (err) {
     console.error('Re-capture failed:', err);
@@ -823,26 +852,26 @@ async function executeRecapture() {
   }
 }
 
-// Initialize re-capture modal event handlers
+// 재캡쳐 모달 이벤트 핸들러 초기화
 document.addEventListener('DOMContentLoaded', () => {
-  // Re-capture modal close buttons
+  // 재캡쳐 모달 닫기 버튼
   const closeBtn = document.getElementById('btn-recapture-close');
   if (closeBtn) closeBtn.addEventListener('click', closeRecaptureModal);
 
   const cancelBtn = document.getElementById('btn-recapture-cancel');
   if (cancelBtn) cancelBtn.addEventListener('click', closeRecaptureModal);
 
-  // Re-capture start button
+  // 재캡쳐 시작 버튼
   const startBtn = document.getElementById('btn-recapture-start');
   if (startBtn) startBtn.addEventListener('click', executeRecapture);
 
-  // Mode selection → show/hide mode-specific options
+  // 모드 선택 → 모드별 옵션 표시/숨김
   const modeSelect = document.getElementById('recapture-mode');
   if (modeSelect) {
     modeSelect.addEventListener('change', _updateRecaptureModeUI);
   }
 
-  // Interval select → show/hide custom input
+  // 간격 선택 → 직접 입력 필드 표시/숨김
   const intervalSelect = document.getElementById('recapture-interval');
   const customIntervalGroup = document.getElementById('recapture-custom-interval-group');
   if (intervalSelect && customIntervalGroup) {
@@ -855,7 +884,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Scene threshold slider → update display value
+  // 장면 임계값 슬라이더 → 표시값 업데이트
   const thresholdSlider = document.getElementById('recapture-scene-threshold');
   const thresholdValue = document.getElementById('recapture-threshold-value');
   if (thresholdSlider && thresholdValue) {
@@ -864,7 +893,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Close modal on overlay click
+  // 오버레이 클릭 시 모달 닫기
   const modal = document.getElementById('recapture-modal');
   if (modal) {
     modal.addEventListener('click', (e) => {
@@ -872,7 +901,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // ─── Delete Confirmation Modal event handlers ────────────────
+  // ─── 삭제 확인 모달 이벤트 핸들러 ───────────────────────────
   const deleteCloseBtn = document.getElementById('btn-delete-close');
   if (deleteCloseBtn) deleteCloseBtn.addEventListener('click', closeDeleteConfirmModal);
 
@@ -882,7 +911,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const deleteConfirmBtn = document.getElementById('btn-delete-confirm');
   if (deleteConfirmBtn) deleteConfirmBtn.addEventListener('click', executeDelete);
 
-  // Close delete modal on overlay click
+  // 삭제 모달 오버레이 클릭 시 닫기
   const deleteModal = document.getElementById('delete-confirm-modal');
   if (deleteModal) {
     deleteModal.addEventListener('click', (e) => {
@@ -891,15 +920,15 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-// ─── Delete Confirmation Modal ─────────────────────────────────────
+// ─── 삭제 확인 모달 ────────────────────────────────────────────────
 
-/** Currently targeted video ID for deletion */
+/** 현재 삭제 대상 영상 ID */
 let _deleteVideoId = null;
 
 /**
- * Open the delete confirmation modal for a library item.
- * @param {string} videoId
- * @param {string} title
+ * 라이브러리 항목에 대한 삭제 확인 모달을 열고 대상 정보를 설정한다.
+ * @param {string} videoId - 삭제할 영상 ID
+ * @param {string} title - 영상 제목 (확인 다이얼로그에 표시)
  */
 function openDeleteConfirmModal(videoId, title) {
   const modal = document.getElementById('delete-confirm-modal');
@@ -920,7 +949,7 @@ function openDeleteConfirmModal(videoId, title) {
 }
 
 /**
- * Close the delete confirmation modal.
+ * 삭제 확인 모달을 닫고 상태를 초기화한다.
  */
 function closeDeleteConfirmModal() {
   const modal = document.getElementById('delete-confirm-modal');
@@ -929,7 +958,7 @@ function closeDeleteConfirmModal() {
 }
 
 /**
- * Execute the deletion after user confirms.
+ * 사용자 확인 후 라이브러리 항목을 삭제한다.
  */
 async function executeDelete() {
   if (!_deleteVideoId) return;
@@ -937,7 +966,7 @@ async function executeDelete() {
   const videoId = _deleteVideoId;
   const confirmBtn = document.getElementById('btn-delete-confirm');
 
-  // Disable button to prevent double-click
+  // 더블 클릭 방지를 위해 버튼 비활성화
   if (confirmBtn) {
     confirmBtn.disabled = true;
     confirmBtn.textContent = t('library_deleting') || '...';

@@ -1,31 +1,31 @@
-//! YouTube URL validation — backend validation to complement frontend checks.
+//! YouTube URL 유효성 검사 — 프론트엔드 검사를 보완하는 백엔드 검증 모듈.
 //!
-//! Provides `validate_youtube_url` Tauri command and `extract_video_id` utility.
+//! `validate_youtube_url` Tauri 커맨드와 `extract_video_id` 유틸리티를 제공한다.
 
 use serde::{Deserialize, Serialize};
 
-/// Result of YouTube URL validation.
+/// YouTube URL 유효성 검사 결과.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UrlValidationResult {
-    /// Whether the URL is a valid YouTube video URL.
+    /// URL이 유효한 YouTube 영상 URL인지 여부.
     pub valid: bool,
-    /// Extracted 11-character video ID (empty if invalid).
+    /// 추출된 11자 영상 ID (유효하지 않으면 빈 문자열).
     pub video_id: String,
-    /// Human-readable error message (empty if valid).
+    /// 사람이 읽을 수 있는 오류 메시지 (유효하면 빈 문자열).
     pub error: String,
 }
 
-/// Extract the 11-character video ID from a YouTube URL.
+/// YouTube URL에서 11자 영상 ID를 추출한다.
 ///
-/// Supports:
+/// 지원 형식:
 /// - `https://www.youtube.com/watch?v=VIDEO_ID`
 /// - `https://youtu.be/VIDEO_ID`
 /// - `https://www.youtube.com/embed/VIDEO_ID`
 /// - `https://www.youtube.com/shorts/VIDEO_ID`
-/// - URLs with additional query parameters
-/// - Both http and https
+/// - 추가 쿼리 파라미터가 있는 URL
+/// - http 및 https 모두
 ///
-/// Returns `Some(video_id)` if valid, `None` otherwise.
+/// 유효하면 `Some(video_id)`, 그렇지 않으면 `None`을 반환한다.
 pub fn extract_video_id(url: &str) -> Option<String> {
     let url = url.trim();
     if url.is_empty() {
@@ -78,15 +78,15 @@ pub fn extract_video_id(url: &str) -> Option<String> {
     None
 }
 
-/// YouTube video IDs are exactly 11 characters: [A-Za-z0-9_-]
+/// YouTube 영상 ID는 정확히 11자: [A-Za-z0-9_-]
 fn is_valid_video_id(id: &str) -> bool {
     id.len() == 11 && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
 }
 
-/// Tauri command: validate a YouTube URL and return the video ID.
+/// Tauri 커맨드: YouTube URL의 유효성을 검사하고 영상 ID를 반환한다.
 ///
-/// Called by the frontend for server-side validation before adding to queue.
-/// Accepts both single video URLs and playlist URLs.
+/// 큐에 추가하기 전 서버 측 검증을 위해 프론트엔드에서 호출한다.
+/// 단일 영상 URL과 재생목록 URL 모두 허용한다.
 #[tauri::command]
 pub fn validate_youtube_url(url: String) -> UrlValidationResult {
     // First try to extract a video ID

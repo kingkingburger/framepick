@@ -1,3 +1,9 @@
+//! framepick 라이브러리 루트 — 모듈 선언 및 Tauri 앱 초기화.
+//!
+//! 모든 기능 모듈을 pub으로 노출하고,
+//! `run()` 함수에서 Tauri 빌더를 구성하여 앱을 실행한다.
+//! 플러그인 등록, 상태 주입, Tauri 커맨드 핸들러 등록이 이곳에서 이뤄진다.
+
 pub mod capture;
 pub mod cmd_util;
 pub mod tools_manager;
@@ -21,8 +27,12 @@ pub mod url_validator;
 use input_state::PipelineState;
 use settings::{load_settings, Settings, SettingsState};
 
+/// Tauri 앱을 초기화하고 실행한다.
+///
+/// config.json에서 설정을 불러오고(없으면 기본값 사용),
+/// 플러그인·상태·커맨드 핸들러를 등록한 뒤 이벤트 루프를 시작한다.
 pub fn run() {
-    // Load settings from config.json (or create defaults)
+    // config.json 로드 (실패 시 기본값 사용)
     let initial_settings = load_settings().unwrap_or_else(|e| {
         eprintln!("Warning: failed to load settings ({e}), using defaults");
         Settings::default()
@@ -53,6 +63,7 @@ pub fn run() {
             // Slides viewer
             slides_viewer::load_slides_html,
             slides_viewer::list_library_entries,
+            slides_viewer::get_resolved_library_path,
             slides_viewer::get_slides_metadata,
             slides_viewer::get_slides_path,
             slides_viewer::get_capture_frames,

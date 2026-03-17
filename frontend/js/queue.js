@@ -1,18 +1,19 @@
 /**
- * queue.js - Processing queue UI component for framepick
+ * @file queue.js
+ * @description framepick 작업 큐 UI 컴포넌트
  *
- * Displays a list of queued URLs with:
- *   - Current URL being processed with a progress bar
- *   - Stage-based progress (e.g., "3/5 steps: downloading... 45%")
- *   - Status icons for each queued item (pending, processing, completed, failed)
+ * 큐에 등록된 URL 목록을 표시하며 다음을 포함한다:
+ *   - 현재 처리 중인 URL과 진행 표시줄
+ *   - 단계별 진행 상태 (예: "3/5 단계: 다운로드 중... 45%")
+ *   - 각 항목의 상태 아이콘 (대기/처리/완료/실패)
  *
- * Listens for backend Tauri events:
+ * 수신하는 Tauri 이벤트:
  *   - queue-item-status: { id, status, progress?, title?, error? }
  *   - queue-progress: { total, completed, failed, is_processing }
  *   - pipeline:progress: { queue_id, stage, stage_number, total_stages, percent, detail? }
  *   - pipeline:error: { queue_id, stage, message }
  *
- * Emits DOM events:
+ * 발행하는 DOM 이벤트:
  *   - queueItemAdded: { id, url, videoId }
  *   - queueItemCompleted: { id }
  *   - queueItemFailed: { id, error }
@@ -26,11 +27,11 @@ const QueueUI = (() => {
   let containerEl = null;
   let isProcessing = false;
 
-  /** Elapsed-time tracker for the currently processing item */
+  /** 현재 처리 중인 항목의 경과 시간 추적기 */
   let _elapsedTimer = null;
   let _processingStartTime = null;
 
-  /** Track IDs that already showed a failure toast to prevent duplicates */
+  /** 중복 토스트 방지를 위해 이미 실패 토스트를 표시한 ID 추적 */
   let _failToastShown = new Set();
 
   /**
@@ -49,7 +50,7 @@ const QueueUI = (() => {
    * @property {string|null} [errorMessage]
    */
 
-  // Pipeline stages definition (max set for subtitle mode; non-subtitle modes use a subset)
+  // 파이프라인 단계 정의 (자막 모드 기준 최대 세트; 다른 모드는 하위 집합 사용)
   const PIPELINE_STAGES = [
     { key: 'queue_stage_download', label: 'Downloading' },
     { key: 'queue_stage_subtitle', label: 'Fetching subtitles' },
@@ -60,7 +61,7 @@ const QueueUI = (() => {
 
   const TOTAL_STEPS = PIPELINE_STAGES.length;
 
-  // Stage key mapping from backend snake_case to our PIPELINE_STAGES indices
+  // 백엔드 snake_case 단계 키를 PIPELINE_STAGES 인덱스로 매핑
   const STAGE_KEY_MAP = {
     'downloading': 'queue_stage_download',
     'extracting_subtitles': 'queue_stage_subtitle',
@@ -70,7 +71,7 @@ const QueueUI = (() => {
     'done': 'queue_status_done',
   };
 
-  // Status icons as inline SVG
+  // 상태별 인라인 SVG 아이콘
   const STATUS_ICONS = {
     pending: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
     processing: '<svg class="queue-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>',
@@ -80,7 +81,7 @@ const QueueUI = (() => {
   };
 
   /**
-   * Initialize the queue UI.
+   * 큐 UI를 초기화한다.
    */
   function init() {
     containerEl = document.getElementById('queue-container');
@@ -90,41 +91,41 @@ const QueueUI = (() => {
     }
     render();
 
-    // Listen for language changes to re-render
+    // 언어 변경 시 큐 UI 재렌더링
     document.addEventListener('languageChanged', () => render());
 
-    // Set up Tauri event listeners for real-time updates from the backend
+    // 백엔드에서 실시간 업데이트를 받기 위한 Tauri 이벤트 리스너 설정
     _setupTauriListeners();
   }
 
   /**
-   * Set up Tauri event listeners for backend → frontend communication.
+   * 백엔드 → 프론트엔드 통신을 위한 Tauri 이벤트 리스너를 설정한다.
    */
   function _setupTauriListeners() {
     if (!window.__TAURI__ || !window.__TAURI__.event) return;
     const { listen } = window.__TAURI__.event;
 
-    // Queue item status changes (from queue_processor.rs)
+    // 큐 항목 상태 변경 (queue_processor.rs에서 발행)
     listen('queue-item-status', (event) => {
       const data = event.payload;
       _handleBackendStatusUpdate(data);
     });
 
-    // Overall queue progress (from queue_processor.rs)
+    // 전체 큐 진행 상태 (queue_processor.rs에서 발행)
     listen('queue-progress', (event) => {
       const data = event.payload;
       isProcessing = data.is_processing;
-      // Re-render to update processing indicator
+      // 처리 중 표시 업데이트를 위해 재렌더링
       render();
     });
 
-    // Pipeline stage-level progress (from progress.rs ProgressTracker)
+    // 파이프라인 단계별 진행 상태 (progress.rs ProgressTracker에서 발행)
     listen('pipeline:progress', (event) => {
       const data = event.payload;
       _handlePipelineProgress(data);
     });
 
-    // Pipeline errors (from progress.rs ProgressTracker)
+    // 파이프라인 오류 이벤트 (progress.rs ProgressTracker에서 발행)
     listen('pipeline:error', (event) => {
       const data = event.payload;
       _handlePipelineError(data);
@@ -132,14 +133,14 @@ const QueueUI = (() => {
   }
 
   /**
-   * Handle a queue item status update from the backend.
+   * 백엔드에서 받은 큐 항목 상태 업데이트를 처리한다.
    * @param {{ id: number, status: string, progress?: number, title?: string, error?: string }} data
    */
   function _handleBackendStatusUpdate(data) {
     const item = _findItem(data.id);
     if (!item) return;
 
-    // Map backend status to our local status
+    // 백엔드 상태를 로컬 상태로 매핑
     item.status = data.status;
     if (data.title) item.title = data.title;
     if (data.error) item.errorMessage = data.error;
@@ -164,7 +165,7 @@ const QueueUI = (() => {
       item.errorMessage = data.error || t('queue_error_unknown');
       _checkProcessingDone();
 
-      // Show toast notification for the failure (deduped)
+      // 실패 토스트 알림 표시 (중복 방지)
       _showFailureToast(data.id, item.title, item.errorMessage);
 
       document.dispatchEvent(new CustomEvent('queueItemFailed', {
@@ -172,7 +173,7 @@ const QueueUI = (() => {
       }));
     }
 
-    // "skipped" status: duplicate detected during processing — treat like completed but with a warning
+    // "skipped" 상태: 처리 중 중복 감지 — 완료와 유사하지만 경고로 처리
     if (data.status === 'skipped') {
       _stopElapsedTimer();
       item.status = 'skipped';
@@ -184,15 +185,15 @@ const QueueUI = (() => {
   }
 
   /**
-   * Handle pipeline stage-level progress from the backend.
-   * Maps progress.rs stages to our PIPELINE_STAGES.
+   * 백엔드에서 받은 파이프라인 단계별 진행 상태를 처리한다.
+   * progress.rs 단계를 PIPELINE_STAGES에 매핑한다.
    * @param {{ queue_id: number, stage: string, stage_number: number, total_stages: number, percent: number, detail?: string }} data
    */
   function _handlePipelineProgress(data) {
     const item = _findItem(data.queue_id);
     if (!item) return;
 
-    // Handle 'done' stage
+    // 'done' 단계 처리
     if (data.stage === 'done') {
       _stopElapsedTimer();
       item.status = 'completed';
@@ -208,14 +209,14 @@ const QueueUI = (() => {
       return;
     }
 
-    // Ensure status is 'processing' when we get progress
+    // 진행 데이터를 받으면 상태를 'processing'으로 설정
     if (item.status === 'pending') {
       item.status = 'processing';
       isProcessing = true;
       _startElapsedTimer(data.queue_id);
     }
 
-    // Map backend stage to our step index (0-based) and use backend's total_stages
+    // 백엔드 단계를 0-based 단계 인덱스로 매핑하고 백엔드의 total_stages 사용
     item.currentStep = Math.max(0, data.stage_number - 1);
     item.totalSteps = data.total_stages;
     item.stagePercent = data.percent;
@@ -226,7 +227,7 @@ const QueueUI = (() => {
   }
 
   /**
-   * Handle pipeline error event from the backend.
+   * 백엔드에서 받은 파이프라인 오류 이벤트를 처리한다.
    * @param {{ queue_id: number, stage: string, message: string }} data
    */
   function _handlePipelineError(data) {
@@ -238,7 +239,7 @@ const QueueUI = (() => {
     item.errorMessage = data.message;
     _checkProcessingDone();
 
-    // Show toast notification for the failure (deduped)
+    // 실패 토스트 알림 표시 (중복 방지)
     _showFailureToast(data.queue_id, item.title, data.message);
 
     document.dispatchEvent(new CustomEvent('queueItemFailed', {
@@ -249,14 +250,14 @@ const QueueUI = (() => {
   }
 
   /**
-   * Add a URL to the processing queue.
-   * Adds to both local state and backend queue, then starts processing.
+   * URL을 처리 큐에 추가한다.
+   * 로컬 상태와 백엔드 큐에 모두 추가한 후 처리를 시작한다.
    * @param {string} url
    * @param {string} videoId
-   * @returns {Promise<number>} queue item id
+   * @returns {Promise<number>} 큐 항목 id
    */
   async function addItem(url, videoId) {
-    // Get current capture mode config from DOM
+    // DOM에서 현재 캡쳐 모드 설정 읽기
     const modeConfig = typeof getCaptureModeConfig === 'function'
       ? getCaptureModeConfig()
       : { mode: 'subtitle' };
@@ -277,7 +278,7 @@ const QueueUI = (() => {
       errorMessage: null,
     };
 
-    // Add to backend queue first
+    // 먼저 백엔드 큐에 추가
     if (window.__TAURI__ && window.__TAURI__.core) {
       try {
         const backendItem = await window.__TAURI__.core.invoke('add_queue_item', {
@@ -292,7 +293,7 @@ const QueueUI = (() => {
             progress: null,
           }
         });
-        // Use backend's assigned values
+        // 백엔드가 할당한 값 사용
         item.id = backendItem.id;
       } catch (err) {
         console.warn('Failed to add to backend queue:', err);
@@ -308,14 +309,14 @@ const QueueUI = (() => {
       detail: { id: item.id, url, videoId }
     }));
 
-    // Auto-start processing
+    // 자동으로 처리 시작
     _startProcessing();
 
     return item.id;
   }
 
   /**
-   * Start the backend queue processing loop.
+   * 백엔드 큐 처리 루프를 시작한다.
    */
   async function _startProcessing() {
     if (isProcessing) return;
@@ -331,7 +332,7 @@ const QueueUI = (() => {
   }
 
   /**
-   * Start processing a queue item (for manual/local use).
+   * 큐 항목 처리를 시작한다 (수동/로컬 사용 시).
    * @param {number} id
    */
   function startItem(id) {
@@ -350,10 +351,10 @@ const QueueUI = (() => {
   }
 
   /**
-   * Update progress for a queue item (for manual/local use).
+   * 큐 항목의 진행 상태를 업데이트한다 (수동/로컬 사용 시).
    * @param {number} id
-   * @param {number} step - 0-based step index
-   * @param {number} percent - 0-100 within the current step
+   * @param {number} step - 0부터 시작하는 단계 인덱스
+   * @param {number} percent - 현재 단계 내 0-100 진행률
    */
   function updateProgress(id, step, percent) {
     const item = _findItem(id);
@@ -366,7 +367,7 @@ const QueueUI = (() => {
   }
 
   /**
-   * Mark a queue item as completed (for manual/local use).
+   * 큐 항목을 완료 상태로 표시한다 (수동/로컬 사용 시).
    * @param {number} id
    */
   function completeItem(id) {
@@ -384,7 +385,7 @@ const QueueUI = (() => {
   }
 
   /**
-   * Mark a queue item as failed (for manual/local use).
+   * 큐 항목을 실패 상태로 표시한다 (수동/로컬 사용 시).
    * @param {number} id
    * @param {string} errorMessage
    */
@@ -402,14 +403,14 @@ const QueueUI = (() => {
   }
 
   /**
-   * Remove a specific item from the queue (only if not processing).
+   * 큐에서 특정 항목을 제거한다 (처리 중이 아닌 경우에만).
    * @param {number} id
    */
   async function removeItem(id) {
     const item = _findItem(id);
     if (!item || item.status === 'processing') return;
 
-    // Remove from backend
+    // 백엔드에서 제거
     if (window.__TAURI__ && window.__TAURI__.core) {
       try {
         await window.__TAURI__.core.invoke('remove_queue_item', { id });
@@ -424,12 +425,12 @@ const QueueUI = (() => {
   }
 
   /**
-   * Clear all completed and failed items from the queue.
+   * 완료 및 실패한 모든 항목을 큐에서 제거한다.
    */
   async function clearCompleted() {
     const toRemove = queue.filter(q => q.status === 'completed' || q.status === 'failed' || q.status === 'skipped');
 
-    // Remove from backend
+    // 백엔드에서 제거
     if (window.__TAURI__ && window.__TAURI__.core) {
       for (const item of toRemove) {
         try {
@@ -440,7 +441,7 @@ const QueueUI = (() => {
       }
     }
 
-    // Clean up failure toast tracking for removed items
+    // 제거된 항목의 실패 토스트 추적 데이터 정리
     toRemove.forEach(item => _failToastShown.delete(item.id));
 
     queue = queue.filter(q => q.status === 'pending' || q.status === 'processing');
@@ -450,7 +451,7 @@ const QueueUI = (() => {
   }
 
   /**
-   * Get the full queue state (for external consumers).
+   * 전체 큐 상태를 반환한다 (외부 소비자용).
    * @returns {Array<QueueItem>}
    */
   function getQueue() {
@@ -458,7 +459,7 @@ const QueueUI = (() => {
   }
 
   /**
-   * Get the count of items by status.
+   * 상태별 항목 수를 반환한다.
    * @returns {{ pending: number, processing: number, completed: number, failed: number, total: number }}
    */
   function getCounts() {
@@ -470,14 +471,14 @@ const QueueUI = (() => {
   }
 
   /**
-   * Retry a failed queue item — resets it to pending and re-queues.
+   * 실패한 큐 항목을 재시도한다 — 대기 상태로 초기화하고 재큐잉한다.
    * @param {number} id
    */
   async function retryItem(id) {
     const item = _findItem(id);
     if (!item || item.status !== 'failed') return;
 
-    // Reset local state
+    // 로컬 상태 초기화
     item.status = 'pending';
     item.currentStep = 0;
     item.stagePercent = 0;
@@ -486,12 +487,12 @@ const QueueUI = (() => {
     item._detail = null;
     _failToastShown.delete(id);
 
-    // Reset on backend
+    // 백엔드 상태 초기화
     if (window.__TAURI__ && window.__TAURI__.core) {
       try {
         await window.__TAURI__.core.invoke('retry_queue_item', { id: item.id });
       } catch (err) {
-        // If retry command doesn't exist, try remove + re-add
+        // retry 명령이 없으면 제거 후 재추가 방식으로 처리
         console.warn('retry_queue_item not available, using remove+add:', err);
         try {
           await window.__TAURI__.core.invoke('remove_queue_item', { id: item.id });
@@ -515,20 +516,20 @@ const QueueUI = (() => {
 
     render();
 
-    // Auto-start processing if not already running
+    // 처리 중이 아닌 경우 자동으로 처리 시작
     _startProcessing();
   }
 
-  // ---- Internal helpers ----
+  // ---- 내부 헬퍼 함수 ----
 
   function _findItem(id) {
     return queue.find(q => q.id === id) || null;
   }
 
   /**
-   * Show a toast notification for a failed queue item (deduped per item ID).
+   * 실패한 큐 항목에 대한 토스트 알림을 표시한다 (항목 ID별 중복 방지).
    * @param {number} itemId
-   * @param {string|null} title - Video title if available
+   * @param {string|null} title - 영상 제목 (있는 경우)
    * @param {string} errorMessage
    */
   function _showFailureToast(itemId, title, errorMessage) {
@@ -543,7 +544,7 @@ const QueueUI = (() => {
       message = t('error_processing_failed_short', { error });
     }
 
-    // Use the global showToast if available, otherwise use our local _showToast
+    // 전역 showToast가 있으면 사용, 없으면 로컬 _showToast 사용
     if (typeof showToast === 'function') {
       showToast(message, 'error');
     } else {
@@ -559,7 +560,7 @@ const QueueUI = (() => {
   }
 
   /**
-   * Start elapsed time tracking for the currently processing item.
+   * 현재 처리 중인 항목의 경과 시간 추적을 시작한다.
    * @param {number} itemId
    */
   function _startElapsedTimer(itemId) {
@@ -569,14 +570,14 @@ const QueueUI = (() => {
       item._startedAt = Date.now();
     }
     _processingStartTime = Date.now();
-    // Update elapsed display every second
+    // 1초마다 경과 시간 표시 업데이트
     _elapsedTimer = setInterval(() => {
       _updateElapsedDisplay();
     }, 1000);
   }
 
   /**
-   * Stop the elapsed time tracking interval.
+   * 경과 시간 추적 인터벌을 중지한다.
    */
   function _stopElapsedTimer() {
     if (_elapsedTimer) {
@@ -587,7 +588,7 @@ const QueueUI = (() => {
   }
 
   /**
-   * Update just the elapsed time display without full re-render.
+   * 전체 재렌더링 없이 경과 시간 표시만 업데이트한다.
    */
   function _updateElapsedDisplay() {
     if (!containerEl) return;
@@ -597,7 +598,7 @@ const QueueUI = (() => {
   }
 
   /**
-   * Format milliseconds into a human-readable elapsed time string.
+   * 밀리초를 사람이 읽기 쉬운 경과 시간 문자열로 변환한다.
    * @param {number} ms
    * @returns {string}
    */
@@ -613,9 +614,9 @@ const QueueUI = (() => {
   }
 
   /**
-   * Get the queue position for pending items (1-based).
+   * 대기 중인 항목의 큐 순서를 반환한다 (1부터 시작).
    * @param {QueueItem} item
-   * @returns {number} position (1-based) or 0 if not pending
+   * @returns {number} 순서 (1부터 시작), 대기 중이 아니면 0
    */
   function _getPendingPosition(item) {
     if (item.status !== 'pending') return 0;
@@ -624,7 +625,7 @@ const QueueUI = (() => {
   }
 
   /**
-   * Truncate a URL for display.
+   * 표시용으로 URL을 잘라낸다.
    * @param {string} url
    * @param {number} maxLen
    * @returns {string}
@@ -635,21 +636,21 @@ const QueueUI = (() => {
   }
 
   /**
-   * Compute overall progress percentage for the progress bar.
+   * 진행 표시줄의 전체 진행률(%)을 계산한다.
    * @param {QueueItem} item
    * @returns {number} 0-100
    */
   function _overallPercent(item) {
     if (item.status === 'completed') return 100;
     if (item.status === 'failed' || item.status === 'pending') return 0;
-    // Each step contributes equally
+    // 각 단계가 동일한 비중을 가짐
     const steps = item.totalSteps || TOTAL_STEPS;
     const stepWeight = 100 / steps;
     return Math.round(item.currentStep * stepWeight + (item.stagePercent / 100) * stepWeight);
   }
 
   /**
-   * Build the stage label string like "3/5 steps: Downloading... 45%"
+   * "3/5 단계: 다운로드 중... 45%"와 같은 단계 레이블 문자열을 생성한다.
    * @param {QueueItem} item
    * @returns {string}
    */
@@ -666,12 +667,12 @@ const QueueUI = (() => {
     return `${stepNum}/${steps} ${t('queue_steps')}: ${stageName}${pct > 0 ? '... ' + pct + '%' : ''}${detail}`;
   }
 
-  // ---- Render throttling ----
+  // ---- 렌더링 스로틀링 ----
   let _renderScheduled = false;
 
   /**
-   * Schedule a render on the next animation frame (debounce rapid updates).
-   * Immediate render if called the first time without a pending frame.
+   * 다음 애니메이션 프레임에 렌더링을 예약한다 (연속 업데이트 디바운스).
+   * 대기 중인 프레임이 없으면 즉시 렌더링한다.
    */
   function _scheduleRender() {
     if (_renderScheduled) return;
@@ -683,14 +684,14 @@ const QueueUI = (() => {
   }
 
   /**
-   * Public render entry point — schedules a batched render.
+   * 공개 렌더링 진입점 — 배치 렌더링을 예약한다.
    */
   function render() {
     _scheduleRender();
   }
 
   /**
-   * Actual render implementation.
+   * 실제 렌더링 구현체.
    */
   function _doRender() {
     if (!containerEl) return;
@@ -706,17 +707,17 @@ const QueueUI = (() => {
     const counts = getCounts();
     const hasCompleted = counts.completed > 0 || counts.failed > 0 || counts.skipped > 0;
 
-    // Find the currently processing item
+    // 현재 처리 중인 항목 찾기
     const processingItem = queue.find(q => q.status === 'processing');
 
     let html = '<div class="queue-panel">';
 
-    // Queue header with status badges
+    // 상태 배지가 포함된 큐 헤더
     html += '<div class="queue-header">';
     html += `<h3 class="queue-title" data-i18n="queue_title">${t('queue_title')}</h3>`;
     html += '<div class="queue-header-actions">';
 
-    // Status summary badges
+    // 상태 요약 배지
     html += '<div class="queue-badges">';
     if (counts.processing > 0) {
       html += `<span class="queue-badge queue-badge-active">${STATUS_ICONS.processing} ${counts.processing}</span>`;
@@ -740,7 +741,7 @@ const QueueUI = (() => {
     }
     html += '</div></div>';
 
-    // Active processing section with multi-segment progress bar
+    // 다중 세그먼트 진행 표시줄이 포함된 현재 처리 섹션
     if (processingItem) {
       const overallPct = _overallPercent(processingItem);
       const displayName = processingItem.title || _truncateUrl(processingItem.url, 60);
@@ -753,7 +754,7 @@ const QueueUI = (() => {
       html += '<div class="queue-active-header">';
       html += `<span class="queue-active-url" title="${_escapeAttr(processingItem.url)}">${_escapeHtml(displayName)}</span>`;
       html += '<div class="queue-active-stats">';
-      // Elapsed time
+      // 경과 시간
       const elapsed = _processingStartTime ? _formatElapsed(Date.now() - _processingStartTime) : '';
       if (elapsed) {
         html += `<span class="queue-active-elapsed" title="${t('queue_elapsed')}">${elapsed}</span>`;
@@ -762,7 +763,7 @@ const QueueUI = (() => {
       html += '</div>';
       html += '</div>';
 
-      // Stage info row: step badge + stage name + stage percentage
+      // 단계 정보 행: 단계 배지 + 단계명 + 단계 진행률
       html += '<div class="queue-stage-info">';
       html += `<span class="queue-stage-step">${stepNum}/${steps}</span>`;
       html += `<span class="queue-stage-name">${_escapeHtml(stageName)}</span>`;
@@ -770,21 +771,21 @@ const QueueUI = (() => {
       html += `<span class="queue-stage-pct">${stagePct}%${detail}</span>`;
       html += '</div>';
 
-      // Multi-segment progress bar — one segment per pipeline stage
+      // 파이프라인 단계당 하나의 세그먼트로 구성된 다중 세그먼트 진행 표시줄
       html += '<div class="queue-segments">';
       for (let i = 0; i < steps; i++) {
         let segClass = 'queue-segment';
         let segWidth = 0;
         if (i < processingItem.currentStep) {
-          // Completed stage
+          // 완료된 단계
           segClass += ' queue-segment-done';
           segWidth = 100;
         } else if (i === processingItem.currentStep) {
-          // Current stage
+          // 현재 단계
           segClass += ' queue-segment-active';
           segWidth = processingItem.stagePercent;
         }
-        // else: pending stage, segWidth stays 0
+        // else: 대기 중인 단계, segWidth는 0 유지
 
         html += `<div class="${segClass}">`;
         html += `<div class="queue-segment-fill" style="width: ${segWidth}%"></div>`;
@@ -795,7 +796,7 @@ const QueueUI = (() => {
       html += '</div>';
     }
 
-    // Queue list
+    // 큐 목록
     html += '<div class="queue-list">';
     queue.forEach((item, idx) => {
       const isActive = item.status === 'processing';
@@ -822,7 +823,7 @@ const QueueUI = (() => {
       } else if (item.status === 'completed') {
         html += `<span class="queue-item-done-text">${t('queue_status_done')}</span>`;
       } else {
-        // Show queue position for pending items with badge
+        // 대기 중인 항목에 큐 순서 배지 표시
         const pos = _getPendingPosition(item);
         if (pos > 0) {
           html += `<span class="queue-position-badge"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${t('queue_position', { n: pos })}</span>`;
@@ -833,10 +834,10 @@ const QueueUI = (() => {
 
       html += '</div>';
 
-      // Action buttons for non-processing items
+      // 처리 중이 아닌 항목의 액션 버튼
       html += '<div class="queue-item-actions">';
       if (item.status === 'failed') {
-        // Retry button for failed items
+        // 실패한 항목의 재시도 버튼
         html += `<button class="queue-item-retry" data-action="retry" data-id="${item.id}" title="${t('queue_retry')}">`;
         html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>';
         html += '</button>';
@@ -856,7 +857,7 @@ const QueueUI = (() => {
 
     containerEl.innerHTML = html;
 
-    // Bind click events
+    // 클릭 이벤트 바인딩
     containerEl.querySelectorAll('[data-action="remove"]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -891,7 +892,7 @@ const QueueUI = (() => {
   }
 
   /**
-   * Show a toast notification.
+   * 토스트 알림을 표시한다.
    */
   function _showToast(message, type) {
     let toast = document.querySelector('.toast');

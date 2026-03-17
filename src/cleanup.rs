@@ -1,33 +1,33 @@
-//! Cleanup module — handles post-extraction file cleanup.
+//! 정리 모듈 — 프레임 추출 후 파일 정리를 담당한다.
 //!
-//! After frame extraction completes, this module conditionally deletes
-//! the downloaded MP4 source file based on the `mp4_retention` config setting.
-//! When `mp4_retention` is `false` (the default), the MP4 is removed to save disk space.
-//! When `mp4_retention` is `true`, the MP4 is preserved alongside the extracted frames.
+//! 프레임 추출이 완료된 후 `mp4_retention` 설정에 따라
+//! 다운로드된 MP4 원본 파일을 조건부로 삭제한다.
+//! `mp4_retention`이 `false`(기본값)이면 디스크 공간 절약을 위해 MP4를 삭제한다.
+//! `mp4_retention`이 `true`이면 MP4를 추출된 프레임과 함께 보존한다.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Result of a cleanup operation.
+/// 정리 작업 결과.
 #[derive(Debug, Clone)]
 pub struct CleanupResult {
-    /// Whether any MP4 files were deleted
+    /// MP4 파일이 삭제되었는지 여부.
     pub mp4_deleted: bool,
-    /// Number of MP4 files deleted
+    /// 삭제된 MP4 파일 수.
     pub files_deleted: u32,
-    /// Total bytes freed by deletion
+    /// 삭제로 확보된 총 바이트 수.
     pub bytes_freed: u64,
-    /// Files that were deleted (paths)
+    /// 삭제된 파일 경로 목록.
     pub deleted_files: Vec<PathBuf>,
-    /// If retention was active, the reason cleanup was skipped
+    /// 보존이 활성화된 경우 정리를 건너뛴 이유.
     pub skipped_reason: Option<String>,
 }
 
-/// Find all MP4 files in a video output directory.
+/// 영상 출력 디렉토리에서 모든 MP4 파일을 찾는다.
 ///
-/// Scans the given directory and its immediate subdirectories (e.g. `source/`)
-/// for files with `.mp4` extension. The downloader places MP4 files in
-/// `{video_dir}/source/`, so we must check subdirectories too.
+/// 주어진 디렉토리와 바로 하위 디렉토리(예: `source/`)를 스캔해
+/// `.mp4` 확장자 파일을 찾는다. 다운로더가 MP4 파일을
+/// `{video_dir}/source/`에 저장하므로 하위 디렉토리도 확인해야 한다.
 pub fn find_mp4_files(video_dir: &Path) -> Vec<PathBuf> {
     let mut mp4_files = Vec::new();
 
@@ -64,20 +64,20 @@ pub fn find_mp4_files(video_dir: &Path) -> Vec<PathBuf> {
     mp4_files
 }
 
-/// Perform post-extraction cleanup on a video directory.
+/// 영상 디렉토리에서 프레임 추출 후 정리를 수행한다.
 ///
-/// If `retain_mp4` is `false`, all `.mp4` files in `video_dir` are deleted.
-/// If `retain_mp4` is `true`, no files are deleted and the result indicates skipped.
+/// `retain_mp4`가 `false`이면 `video_dir`의 모든 `.mp4` 파일을 삭제한다.
+/// `retain_mp4`가 `true`이면 파일을 삭제하지 않고 결과에 건너뜀을 표시한다.
 ///
-/// This function is designed to be called after frame extraction completes
-/// successfully. It logs actions taken and returns a summary.
+/// 프레임 추출이 성공적으로 완료된 후 호출되도록 설계되었다.
+/// 수행한 작업을 로그하고 요약을 반환한다.
 ///
 /// # Arguments
-/// * `video_dir` - Path to the video's output directory (e.g., `library/<video_id>/`)
-/// * `retain_mp4` - Whether to keep the MP4 file (from config.mp4_retention)
+/// * `video_dir` - 영상 출력 디렉토리 경로 (예: `library/<video_id>/`)
+/// * `retain_mp4` - MP4 파일 보존 여부 (config.mp4_retention에서)
 ///
 /// # Returns
-/// A `CleanupResult` summarizing what was done.
+/// 수행된 작업 요약인 `CleanupResult`.
 pub fn cleanup_after_extraction(video_dir: &Path, retain_mp4: bool) -> CleanupResult {
     if retain_mp4 {
         println!(
@@ -150,7 +150,7 @@ pub fn cleanup_after_extraction(video_dir: &Path, retain_mp4: bool) -> CleanupRe
     }
 }
 
-/// Format bytes into a human-readable string (e.g., "1.5 MB").
+/// 바이트를 사람이 읽기 쉬운 문자열로 변환한다 (예: "1.5 MB").
 pub fn format_bytes(bytes: u64) -> String {
     const KB: u64 = 1024;
     const MB: u64 = KB * 1024;

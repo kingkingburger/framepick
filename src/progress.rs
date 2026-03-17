@@ -1,32 +1,32 @@
-//! Stage-based progress reporting for the download/capture pipeline.
+//! 다운로드/캡쳐 파이프라인의 단계별 진행 보고 모듈.
 //!
-//! Defines pipeline stages, tracks the current stage number out of total stages,
-//! and reports percentage progress within each stage via Tauri events.
+//! 파이프라인 단계를 정의하고 전체 단계 중 현재 단계 번호를 추적하며,
+//! Tauri 이벤트를 통해 각 단계 내 진행률을 보고한다.
 
 use crate::input_state::PipelineState;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 
-/// Identifiers for each pipeline stage.
+/// 각 파이프라인 단계의 식별자.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PipelineStage {
-    /// Downloading video from YouTube via yt-dlp
+    /// yt-dlp로 YouTube 영상 다운로드 중.
     Downloading,
-    /// Extracting subtitles (subtitle mode only)
+    /// 자막 추출 중 (자막 모드 전용).
     ExtractingSubtitles,
-    /// Capturing frames via ffmpeg
+    /// ffmpeg으로 프레임 캡쳐 중.
     ExtractingFrames,
-    /// Generating slides.html output
+    /// slides.html 출력 생성 중.
     GeneratingSlides,
-    /// Cleaning up temporary/source files
+    /// 임시/원본 파일 정리 중.
     Cleanup,
-    /// Pipeline complete
+    /// 파이프라인 완료.
     Done,
 }
 
 impl PipelineStage {
-    /// Human-readable i18n key for the stage (used by the frontend to look up translations).
+    /// 단계의 i18n 키 (프론트엔드에서 번역 조회에 사용).
     pub fn i18n_key(&self) -> &'static str {
         match self {
             PipelineStage::Downloading => "progress_downloading",
@@ -39,41 +39,41 @@ impl PipelineStage {
     }
 }
 
-/// Payload emitted via Tauri event `pipeline:progress`.
+/// Tauri 이벤트 `pipeline:progress`로 발행되는 페이로드.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProgressPayload {
-    /// Queue item ID this progress belongs to
+    /// 이 진행 정보가 속한 큐 항목 ID.
     pub queue_id: u32,
-    /// Current pipeline stage
+    /// 현재 파이프라인 단계.
     pub stage: PipelineStage,
-    /// 1-based index of the current stage
+    /// 현재 단계의 1-기반 인덱스.
     pub stage_number: u32,
-    /// Total number of stages in this pipeline run
+    /// 이번 파이프라인 실행의 총 단계 수.
     pub total_stages: u32,
-    /// Progress percentage within the current stage (0–100)
+    /// 현재 단계 내 진행률 (0~100).
     pub percent: u32,
-    /// Optional detail message (e.g., "frame 12/48")
+    /// 선택적 세부 메시지 (예: "frame 12/48").
     #[serde(skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
 }
 
-/// Payload emitted via Tauri event `pipeline:error`.
+/// Tauri 이벤트 `pipeline:error`로 발행되는 페이로드.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ErrorPayload {
-    /// Queue item ID this error belongs to
+    /// 이 오류가 속한 큐 항목 ID.
     pub queue_id: u32,
-    /// Stage where the error occurred
+    /// 오류가 발생한 단계.
     pub stage: PipelineStage,
-    /// Error message
+    /// 오류 메시지.
     pub message: String,
 }
 
-/// Determines the ordered list of stages for a given capture mode.
+/// 주어진 캡쳐 모드에 따른 순서가 있는 단계 목록을 반환한다.
 ///
-/// - `"subtitle"` mode includes subtitle extraction.
-/// - `"scene"` and `"interval"` modes skip subtitle extraction.
+/// - `"subtitle"` 모드는 자막 추출 단계를 포함한다.
+/// - `"scene"` 및 `"interval"` 모드는 자막 추출을 건너뛴다.
 ///
-/// All modes include Cleanup as the last processing stage before Done.
+/// 모든 모드는 Done 전 마지막 처리 단계로 Cleanup을 포함한다.
 pub fn stages_for_mode(capture_mode: &str) -> Vec<PipelineStage> {
     match capture_mode {
         "subtitle" => vec![
@@ -92,7 +92,7 @@ pub fn stages_for_mode(capture_mode: &str) -> Vec<PipelineStage> {
     }
 }
 
-/// Helper to track and emit progress for a single queue item's pipeline run.
+/// 단일 큐 항목의 파이프라인 실행 진행을 추적하고 발행하는 헬퍼.
 pub struct ProgressTracker {
     queue_id: u32,
     stages: Vec<PipelineStage>,
@@ -100,7 +100,7 @@ pub struct ProgressTracker {
 }
 
 impl ProgressTracker {
-    /// Create a new tracker for the given queue item and capture mode.
+    /// 주어진 큐 항목과 캡쳐 모드에 대한 새 트래커를 생성한다.
     pub fn new(queue_id: u32, capture_mode: &str) -> Self {
         Self {
             queue_id,
@@ -109,12 +109,12 @@ impl ProgressTracker {
         }
     }
 
-    /// Total number of stages (excluding Done).
+    /// 총 단계 수 (Done 제외).
     pub fn total_stages(&self) -> u32 {
         self.stages.len() as u32
     }
 
-    /// The current stage (panics if past the end — callers should check).
+    /// 현재 단계 (끝을 지난 경우 패닉 — 호출자가 확인해야 함).
     pub fn current_stage(&self) -> PipelineStage {
         self.stages
             .get(self.current_stage_index)
@@ -122,12 +122,12 @@ impl ProgressTracker {
             .unwrap_or(PipelineStage::Done)
     }
 
-    /// 1-based stage number.
+    /// 1-기반 단계 번호.
     pub fn stage_number(&self) -> u32 {
         (self.current_stage_index + 1).min(self.stages.len()) as u32
     }
 
-    /// Advance to the next stage.  Returns the new stage (or `Done`).
+    /// 다음 단계로 진행한다. 새 단계(또는 `Done`)를 반환한다.
     pub fn advance(&mut self) -> PipelineStage {
         if self.current_stage_index < self.stages.len() {
             self.current_stage_index += 1;
@@ -135,7 +135,7 @@ impl ProgressTracker {
         self.current_stage()
     }
 
-    /// Build a `ProgressPayload` for the current stage at the given percent.
+    /// 현재 단계의 주어진 진행률로 `ProgressPayload`를 생성한다.
     pub fn payload(&self, percent: u32, detail: Option<String>) -> ProgressPayload {
         ProgressPayload {
             queue_id: self.queue_id,
@@ -147,7 +147,7 @@ impl ProgressTracker {
         }
     }
 
-    /// Emit a progress event to the frontend and sync stage info to the queue item.
+    /// 프론트엔드로 진행 이벤트를 발행하고 단계 정보를 큐 항목에 동기화한다.
     pub fn emit(&self, app: &AppHandle, percent: u32, detail: Option<String>) {
         let payload = self.payload(percent, detail);
         // Sync to queue item state so it can be queried via get_queue
@@ -155,13 +155,13 @@ impl ProgressTracker {
         let _ = app.emit("pipeline:progress", &payload);
     }
 
-    /// Emit a stage-complete event (100%) and advance to the next stage.
+    /// 단계 완료 이벤트(100%)를 발행하고 다음 단계로 진행한다.
     pub fn complete_stage(&mut self, app: &AppHandle) {
         self.emit(app, 100, None);
         self.advance();
     }
 
-    /// Emit a "done" event indicating the pipeline finished successfully.
+    /// 파이프라인이 성공적으로 완료되었음을 나타내는 "done" 이벤트를 발행한다.
     pub fn emit_done(&self, app: &AppHandle) {
         let payload = ProgressPayload {
             queue_id: self.queue_id,
@@ -175,7 +175,7 @@ impl ProgressTracker {
         let _ = app.emit("pipeline:progress", &payload);
     }
 
-    /// Emit an error event.
+    /// 오류 이벤트를 발행한다.
     pub fn emit_error(&self, app: &AppHandle, message: &str) {
         let payload = ErrorPayload {
             queue_id: self.queue_id,
@@ -185,8 +185,8 @@ impl ProgressTracker {
         let _ = app.emit("pipeline:error", &payload);
     }
 
-    /// Sync the current progress payload to the queue item's state fields,
-    /// so `get_queue` returns up-to-date pipeline stage info.
+    /// 현재 진행 페이로드를 큐 항목의 상태 필드에 동기화해
+    /// `get_queue`가 최신 파이프라인 단계 정보를 반환하도록 한다.
     fn sync_to_queue(&self, app: &AppHandle, payload: &ProgressPayload) {
         let pipeline = app.state::<PipelineState>();
         let lock_result = pipeline.queue.lock();

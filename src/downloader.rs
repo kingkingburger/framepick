@@ -1,8 +1,7 @@
-//! YouTube video downloader via yt-dlp.
+//! yt-dlp를 사용한 YouTube 영상 다운로드 모듈.
 //!
-//! Downloads a YouTube video with format selection based on quality settings,
-//! and optionally downloads auto-generated subtitles (Korean priority, English
-//! fallback) in json3 format.
+//! 화질 설정에 따라 포맷을 선택하여 YouTube 영상을 다운로드하고,
+//! 자동 생성 자막(한국어 우선, 영어 폴백)을 json3 포맷으로 함께 다운로드한다.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -10,27 +9,27 @@ use std::process::Command;
 use crate::cmd_util::HideWindow;
 use crate::metadata::resolve_ytdlp_path;
 
-/// Result of a successful video download.
+/// 영상 다운로드 성공 결과.
 #[derive(Debug, Clone)]
 pub struct DownloadResult {
-    /// Path to the downloaded MP4 file.
+    /// 다운로드된 MP4 파일 경로.
     pub mp4_path: PathBuf,
-    /// Path to the downloaded subtitle file (if found).
+    /// 다운로드된 자막 파일 경로 (찾지 못하면 None).
     pub subtitle_path: Option<PathBuf>,
 }
 
-/// Download a YouTube video using yt-dlp.
+/// yt-dlp로 YouTube 영상을 다운로드한다.
 ///
-/// Creates `{output_dir}/source/` and downloads the video there.
-/// Format selection is based on `quality`:
+/// `{output_dir}/source/`를 생성하고 그 안에 영상을 저장한다.
+/// 포맷 선택은 `quality`에 따라 결정된다:
 /// - `"best"` — `bestvideo+bestaudio/best`
-/// - anything else (e.g. `"720"`) — `bestvideo[height<=N]+bestaudio/best[height<=N]`
+/// - 그 외 (예: `"720"`) — `bestvideo[height<=N]+bestaudio/best[height<=N]`
 ///
-/// Subtitles are downloaded alongside the video using
-/// `--write-auto-sub --sub-lang ko,en --convert-subs json3`.
+/// 자막은 `--write-auto-sub --sub-lang ko,en --convert-subs json3`으로
+/// 영상과 별도로 다운로드된다.
 ///
-/// Returns a [`DownloadResult`] with the MP4 path and optional subtitle path.
-/// Returns `Err` if yt-dlp fails or no MP4 file is found after download.
+/// 성공 시 [`DownloadResult`](MP4 경로 및 선택적 자막 경로)를 반환한다.
+/// yt-dlp 실패 또는 다운로드 후 MP4 파일을 찾지 못하면 `Err`를 반환한다.
 pub fn download_video(
     url: &str,
     output_dir: &Path,
@@ -120,11 +119,11 @@ pub fn download_video(
     })
 }
 
-/// Build the yt-dlp format selection string from a quality string.
+/// 화질 문자열로 yt-dlp 포맷 선택 문자열을 생성한다.
 ///
-/// `"best"` returns `bestvideo+bestaudio/best`.
-/// A numeric height string like `"720"` returns
-/// `bestvideo[height<=720]+bestaudio/best[height<=720]`.
+/// `"best"`는 `bestvideo+bestaudio/best`를 반환한다.
+/// `"720"` 같은 숫자 높이 문자열은
+/// `bestvideo[height<=720]+bestaudio/best[height<=720]`를 반환한다.
 fn build_format_string(quality: &str) -> String {
     if quality == "best" {
         "bestvideo+bestaudio/best".to_string()
@@ -135,13 +134,13 @@ fn build_format_string(quality: &str) -> String {
     }
 }
 
-/// Look for a json3 subtitle file in `source_dir` for the given `video_id`.
+/// `source_dir`에서 `video_id`에 해당하는 json3 자막 파일을 찾는다.
 ///
-/// Search order:
-/// 1. `{video_id}.ko.json3` — Korean (preferred)
-/// 2. `{video_id}.en.json3` — English fallback
-/// 3. Any `.json3` file in the directory
-/// 4. `None` if nothing is found
+/// 탐색 순서:
+/// 1. `{video_id}.ko.json3` — 한국어 (우선)
+/// 2. `{video_id}.en.json3` — 영어 폴백
+/// 3. 디렉토리 내 임의의 `.json3` 파일
+/// 4. 없으면 `None`
 pub fn find_subtitle_file(source_dir: &Path, video_id: &str) -> Option<PathBuf> {
     // Priority 1: Korean
     let ko_path = source_dir.join(format!("{video_id}.ko.json3"));

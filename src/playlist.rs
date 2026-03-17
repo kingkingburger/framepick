@@ -1,8 +1,8 @@
-//! YouTube playlist detection and video list fetching.
+//! YouTube 재생목록 감지 및 영상 목록 조회 모듈.
 //!
-//! Detects whether a URL is a YouTube playlist (or contains a `list=` parameter),
-//! then uses `yt-dlp --flat-playlist --dump-json` to extract video titles, IDs,
-//! and durations without downloading any media.
+//! URL이 YouTube 재생목록인지(`list=` 파라미터 포함 여부) 감지하고,
+//! `yt-dlp --flat-playlist --dump-json`을 사용해 미디어 다운로드 없이
+//! 영상 제목, ID, 재생 시간을 추출한다.
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -10,54 +10,54 @@ use std::process::Command;
 
 use crate::cmd_util::HideWindow;
 
-/// A single video entry extracted from a playlist via yt-dlp --flat-playlist.
+/// yt-dlp --flat-playlist로 재생목록에서 추출된 단일 영상 항목.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlaylistEntry {
-    /// YouTube video ID (11 characters)
+    /// YouTube 영상 ID (11자).
     pub video_id: String,
-    /// Video title (from playlist metadata)
+    /// 영상 제목 (재생목록 메타데이터에서).
     pub title: String,
-    /// Duration in seconds (may be 0 if unavailable)
+    /// 재생 시간(초), 없으면 0.
     pub duration: f64,
-    /// Full watch URL constructed from the video ID
+    /// 영상 ID로 구성된 전체 watch URL.
     pub url: String,
 }
 
-/// Result of a playlist fetch operation.
+/// 재생목록 조회 작업 결과.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlaylistResult {
-    /// Whether the URL was detected as a playlist
+    /// URL이 재생목록으로 감지되었는지 여부.
     pub is_playlist: bool,
-    /// Playlist title (if available)
+    /// 재생목록 제목 (있는 경우).
     pub playlist_title: String,
-    /// Number of videos in the playlist
+    /// 재생목록의 영상 수.
     pub video_count: usize,
-    /// List of video entries
+    /// 영상 항목 목록.
     pub entries: Vec<PlaylistEntry>,
 }
 
-/// Result of playlist URL detection (client-side check, no yt-dlp needed).
+/// 재생목록 URL 감지 결과 (클라이언트 측 검사, yt-dlp 불필요).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlaylistDetectionResult {
-    /// Whether the URL appears to be or contain a playlist
+    /// URL이 재생목록이거나 재생목록을 포함하는지 여부.
     pub is_playlist: bool,
-    /// Extracted playlist ID (empty if not a playlist)
+    /// 추출된 재생목록 ID (재생목록이 아니면 빈 문자열).
     pub playlist_id: String,
-    /// Whether the URL also contains a video ID (e.g., watch?v=X&list=Y)
+    /// URL에 영상 ID도 포함되는지 여부 (예: watch?v=X&list=Y).
     pub has_video_id: bool,
-    /// Extracted video ID if present
+    /// 존재하는 경우 추출된 영상 ID.
     pub video_id: String,
 }
 
 // ─── Playlist URL Detection ─────────────────────────────────────────
 
-/// YouTube playlist URL patterns:
+/// YouTube 재생목록 URL 패턴:
 /// - `youtube.com/playlist?list=PLAYLIST_ID`
 /// - `youtube.com/watch?v=VIDEO_ID&list=PLAYLIST_ID`
 /// - `youtu.be/VIDEO_ID?list=PLAYLIST_ID`
 ///
-/// Playlist IDs typically start with PL, OL, UU, RD, etc. and are 13-64 chars,
-/// but we accept any non-empty value for the `list` parameter.
+/// 재생목록 ID는 보통 PL, OL, UU, RD 등으로 시작하고 13-64자이지만,
+/// `list` 파라미터의 비어있지 않은 모든 값을 허용한다.
 pub fn detect_playlist(url: &str) -> PlaylistDetectionResult {
     let url = url.trim();
     let mut result = PlaylistDetectionResult {
@@ -100,7 +100,7 @@ pub fn detect_playlist(url: &str) -> PlaylistDetectionResult {
     result
 }
 
-/// Extract a query parameter value from a URL string.
+/// URL 문자열에서 쿼리 파라미터 값을 추출한다.
 fn extract_query_param(url: &str, param_name: &str) -> Option<String> {
     let query_start = url.find('?')?;
     let query = &url[query_start + 1..];
@@ -121,35 +121,35 @@ fn extract_query_param(url: &str, param_name: &str) -> Option<String> {
 
 // ─── yt-dlp Playlist Fetching ───────────────────────────────────────
 
-/// Resolve the path to yt-dlp executable via tools_manager.
+/// tools_manager를 통해 yt-dlp 실행 파일 경로를 반환한다.
 fn resolve_ytdlp_path() -> PathBuf {
     crate::tools_manager::resolve_ytdlp_path()
 }
 
-/// Raw JSON entry from yt-dlp --flat-playlist --dump-json output.
-/// Each line of output is a JSON object with these fields.
+/// yt-dlp --flat-playlist --dump-json 출력의 원시 JSON 항목.
+/// 출력의 각 줄은 이 필드들을 가진 JSON 객체이다.
 #[derive(Debug, Deserialize)]
 struct YtdlpFlatEntry {
-    /// Video ID
+    /// 영상 ID.
     #[serde(default)]
     id: String,
-    /// Video title
+    /// 영상 제목.
     #[serde(default)]
     title: String,
-    /// Duration in seconds
+    /// 재생 시간(초).
     #[serde(default)]
     duration: Option<f64>,
-    /// Full URL (may be present)
+    /// 전체 URL (있는 경우).
     #[serde(default)]
     url: Option<String>,
 }
 
-/// Fetch playlist entries using `yt-dlp --flat-playlist --dump-json`.
+/// `yt-dlp --flat-playlist --dump-json`으로 재생목록 항목을 가져온다.
 ///
-/// This runs yt-dlp as a subprocess and parses the JSONL output.
-/// Each line is a separate JSON object representing one video in the playlist.
+/// yt-dlp를 서브프로세스로 실행하고 JSONL 출력을 파싱한다.
+/// 각 줄은 재생목록의 영상 하나를 나타내는 별도의 JSON 객체이다.
 ///
-/// Returns an error string if yt-dlp fails to execute or returns an error.
+/// yt-dlp 실행 실패 또는 오류 반환 시 오류 문자열을 반환한다.
 pub fn fetch_playlist_entries(url: &str) -> Result<PlaylistResult, String> {
     let ytdlp = resolve_ytdlp_path();
 
@@ -241,7 +241,7 @@ pub fn fetch_playlist_entries(url: &str) -> Result<PlaylistResult, String> {
     })
 }
 
-/// Format duration in seconds to a human-readable string (HH:MM:SS or MM:SS).
+/// 재생 시간(초)을 사람이 읽기 쉬운 문자열로 변환한다 (HH:MM:SS 또는 MM:SS).
 pub fn format_duration(seconds: f64) -> String {
     let total_secs = seconds.round() as u64;
     let hours = total_secs / 3600;
@@ -257,18 +257,18 @@ pub fn format_duration(seconds: f64) -> String {
 
 // ─── Tauri Commands ─────────────────────────────────────────────────
 
-/// Detect whether a URL is a YouTube playlist without running yt-dlp.
+/// yt-dlp 없이 URL이 YouTube 재생목록인지 감지한다.
 ///
-/// This is a fast client-side check that examines URL patterns.
+/// URL 패턴을 검사하는 빠른 클라이언트 측 검사이다.
 #[tauri::command]
 pub fn detect_playlist_url(url: String) -> PlaylistDetectionResult {
     detect_playlist(&url)
 }
 
-/// Fetch the list of videos in a YouTube playlist using yt-dlp --flat-playlist.
+/// yt-dlp --flat-playlist를 사용해 YouTube 재생목록의 영상 목록을 가져온다.
 ///
-/// This command runs yt-dlp as a subprocess, so it should be called from
-/// an async context. The frontend should show a loading indicator while waiting.
+/// 이 커맨드는 yt-dlp를 서브프로세스로 실행하므로 비동기 컨텍스트에서 호출해야 한다.
+/// 프론트엔드는 대기 중에 로딩 인디케이터를 표시해야 한다.
 #[tauri::command]
 pub async fn fetch_playlist(url: String) -> Result<PlaylistResult, String> {
     // Run the blocking yt-dlp command on a background thread

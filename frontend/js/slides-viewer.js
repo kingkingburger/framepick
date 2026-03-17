@@ -1,18 +1,20 @@
 /**
- * Slides Viewer - Loads and displays slides.html inside the Tauri webview
+ * @file slides-viewer.js
+ * @description 슬라이드 뷰어 컴포넌트
  *
- * Uses an iframe approach to render the standalone slides.html inside the app,
- * with a back button to return to the dashboard view.
- * Handles asset protocol URL resolution for local images via backend rewriting.
+ * Tauri 웹뷰 내부에 slides.html을 로드하여 표시한다.
+ * iframe 방식으로 독립형 slides.html을 앱 안에 렌더링하며,
+ * 뒤로 가기 버튼으로 대시보드 뷰로 돌아갈 수 있다.
+ * 백엔드 rewriting을 통해 로컬 이미지의 asset protocol URL 해석을 처리한다.
  */
 
 const SlidesViewer = {
-  /** Currently loaded video ID */
+  /** 현재 로드된 영상 ID */
   currentVideoId: null,
 
   /**
-   * Initialize the slides viewer.
-   * Sets up event listeners for the viewer panel.
+   * 슬라이드 뷰어를 초기화한다.
+   * 뷰어 패널의 이벤트 리스너를 설정한다.
    */
   init() {
     const backBtn = document.getElementById('viewer-back-btn');
@@ -20,7 +22,7 @@ const SlidesViewer = {
       backBtn.addEventListener('click', () => this.close());
     }
 
-    // Retry button
+    // 재시도 버튼
     const retryBtn = document.getElementById('viewer-retry-btn');
     if (retryBtn) {
       retryBtn.addEventListener('click', () => {
@@ -30,13 +32,13 @@ const SlidesViewer = {
       });
     }
 
-    // Open in external browser button
+    // 외부 브라우저에서 열기 버튼
     const openExternalBtn = document.getElementById('viewer-open-external');
     if (openExternalBtn) {
       openExternalBtn.addEventListener('click', () => this._openExternal());
     }
 
-    // Keyboard shortcut: Escape to close viewer
+    // 키보드 단축키: Escape로 뷰어 닫기
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && this.isOpen()) {
         this.close();
@@ -45,7 +47,7 @@ const SlidesViewer = {
   },
 
   /**
-   * Check if the viewer panel is currently visible.
+   * 뷰어 패널이 현재 표시 중인지 확인한다.
    * @returns {boolean}
    */
   isOpen() {
@@ -54,12 +56,12 @@ const SlidesViewer = {
   },
 
   /**
-   * Open the slides viewer for a given video ID.
-   * Loads slides.html via Tauri command and renders it in an iframe.
-   * Image paths are rewritten by the backend to use Tauri's asset protocol
-   * so local files render correctly in the webview.
+   * 주어진 영상 ID에 대한 슬라이드 뷰어를 연다.
+   * Tauri 명령을 통해 slides.html을 로드하고 iframe에 렌더링한다.
+   * 백엔드가 이미지 경로를 Tauri asset protocol URL로 재작성하여
+   * 로컬 파일이 웹뷰에서 올바르게 표시된다.
    * @param {string} videoId
-   * @param {number} [frameIndex] - Optional 0-based frame index to scroll to after loading
+   * @param {number} [frameIndex] - 로드 후 스크롤할 0부터 시작하는 프레임 인덱스 (선택사항)
    */
   async open(videoId, frameIndex) {
     const viewer = document.getElementById('slides-viewer');
@@ -77,7 +79,7 @@ const SlidesViewer = {
       return;
     }
 
-    // Show loading state
+    // 로딩 상태 표시
     if (viewerError) viewerError.hidden = true;
     if (loadingOverlay) loadingOverlay.hidden = false;
     iframe.hidden = true;
@@ -92,23 +94,23 @@ const SlidesViewer = {
     try {
       let html;
       if (window.__TAURI__) {
-        // Backend reads slides.html, rewrites image src="images/..."
-        // to https://asset.localhost/... URLs, and injects a <base> tag
-        // and CSP meta for correct asset resolution in the iframe srcdoc.
+        // 백엔드가 slides.html을 읽고, image src="images/..."를
+        // https://asset.localhost/... URL로 재작성하며, iframe srcdoc에서
+        // 올바른 asset 해석을 위해 <base> 태그와 CSP 메타를 주입한다.
         html = await window.__TAURI__.core.invoke('load_slides_html', { videoId });
       } else {
-        // Fallback for development without Tauri
+        // Tauri 없는 개발 환경용 폴백
         html = this._generateSampleSlides(videoId);
       }
 
-      // Write HTML content to iframe using srcdoc.
-      // The sandbox="allow-scripts allow-same-origin" on the iframe
-      // ensures scripts in slides.html run while being isolated.
+      // srcdoc를 사용하여 HTML 콘텐츠를 iframe에 작성한다.
+      // iframe의 sandbox="allow-scripts allow-same-origin" 속성이
+      // slides.html의 스크립트가 격리된 상태에서 실행되도록 보장한다.
       iframe.srcdoc = html;
 
-      // Update title and metadata after iframe loads
+      // iframe 로드 후 제목 및 메타데이터 업데이트
       iframe.onload = () => {
-        // Hide loading, show iframe
+        // 로딩 숨기기, iframe 표시
         if (loadingOverlay) loadingOverlay.hidden = true;
         iframe.hidden = false;
 
@@ -121,27 +123,27 @@ const SlidesViewer = {
             viewerTitle.textContent = videoId;
           }
 
-          // Count slides in the loaded document and display in toolbar
+          // 로드된 문서의 슬라이드 수를 세어 툴바에 표시
           const slides = iframeDoc?.querySelectorAll('.slide');
           if (slides && slides.length > 0 && slideCountEl) {
             slideCountEl.textContent = t('viewer_slide_count', { n: slides.length });
           }
         } catch (e) {
-          // Cross-origin or other access error — just show videoId
+          // 크로스 오리진 또는 기타 접근 오류 — videoId만 표시
           viewerTitle.textContent = videoId;
         }
 
-        // Show the open-external button (only in Tauri context)
+        // 외부 열기 버튼 표시 (Tauri 컨텍스트에서만)
         if (openExternalBtn && window.__TAURI__) {
           openExternalBtn.hidden = false;
         }
 
-        // Navigate to specific frame if frameIndex was provided
+        // frameIndex가 제공된 경우 특정 프레임으로 이동
         if (typeof frameIndex === 'number' && frameIndex >= 0) {
           try {
             const iframeWin = iframe.contentWindow;
             if (iframeWin) {
-              // Use hash navigation which the slides.html script handles
+              // slides.html 스크립트가 처리하는 해시 탐색 사용
               iframeWin.location.hash = '#slide-' + frameIndex;
             }
           } catch (e) {
@@ -150,7 +152,7 @@ const SlidesViewer = {
         }
       };
 
-      // Handle iframe load error
+      // iframe 로드 오류 처리
       iframe.onerror = () => {
         if (loadingOverlay) loadingOverlay.hidden = true;
         iframe.hidden = true;
@@ -167,7 +169,7 @@ const SlidesViewer = {
   },
 
   /**
-   * Show error message in the viewer with retry option.
+   * 뷰어에 재시도 옵션과 함께 오류 메시지를 표시한다.
    * @param {string} message
    */
   _showError(message) {
@@ -182,7 +184,7 @@ const SlidesViewer = {
   },
 
   /**
-   * Close the viewer and return to the dashboard.
+   * 뷰어를 닫고 대시보드로 돌아간다.
    */
   close() {
     const viewer = document.getElementById('slides-viewer');
@@ -202,20 +204,20 @@ const SlidesViewer = {
   },
 
   /**
-   * Open the slides.html file in the default external browser.
-   * The standalone file uses relative image paths so it works independently.
+   * 기본 외부 브라우저에서 slides.html 파일을 연다.
+   * 독립형 파일은 상대 이미지 경로를 사용하므로 독립적으로 작동한다.
    */
   async _openExternal() {
     if (!this.currentVideoId || !window.__TAURI__) return;
 
     try {
-      // Use the unified backend command that resolves the path and opens in browser
+      // 경로를 해석하고 브라우저에서 여는 통합 백엔드 명령 사용
       await window.__TAURI__.core.invoke('open_slides_external', {
         videoId: this.currentVideoId,
       });
     } catch (err) {
       console.error('Failed to open slides externally:', err);
-      // Show brief error feedback via toast and button tooltip
+      // 토스트 및 버튼 툴팁으로 간단한 오류 피드백 표시
       if (typeof showToast === 'function') {
         showToast(t('viewer_open_failed'), 'error');
       }
@@ -229,8 +231,8 @@ const SlidesViewer = {
   },
 
   /**
-   * Generate sample slides HTML for development/testing without Tauri backend.
-   * Matches the exact structure produced by the Rust slides_generator.
+   * Tauri 백엔드 없이 개발/테스트용 샘플 슬라이드 HTML을 생성한다.
+   * Rust slides_generator가 생성하는 구조와 동일하다.
    * @param {string} videoId
    * @returns {string}
    */
@@ -405,9 +407,9 @@ body{
     </div>
     <div class="toc-title">목차 — 3개 슬라이드</div>
     <ul class="toc-list" id="tocList">
-      <li><a href="#slide-0" class="toc-link" data-slide="0"><span class="toc-ts">00:00:00</span><span class="toc-preview">안녕하세요, 테스트 슬라이드입니다</span></a></li>
-      <li><a href="#slide-1" class="toc-link" data-slide="1"><span class="toc-ts">00:03:15</span><span class="toc-preview">두 번째 슬라이드 내용</span></a></li>
-      <li><a href="#slide-2" class="toc-link" data-slide="2"><span class="toc-ts">00:07:42</span><span class="toc-preview">마지막 슬라이드입니다</span></a></li>
+      <li><a href="javascript:void(0)" data-href="#slide-0" class="toc-link" data-slide="0"><span class="toc-ts">00:00:00</span><span class="toc-preview">안녕하세요, 테스트 슬라이드입니다</span></a></li>
+      <li><a href="javascript:void(0)" data-href="#slide-1" class="toc-link" data-slide="1"><span class="toc-ts">00:03:15</span><span class="toc-preview">두 번째 슬라이드 내용</span></a></li>
+      <li><a href="javascript:void(0)" data-href="#slide-2" class="toc-link" data-slide="2"><span class="toc-ts">00:07:42</span><span class="toc-preview">마지막 슬라이드입니다</span></a></li>
     </ul>
   </aside>
   <main class="main-content" id="mainContent">

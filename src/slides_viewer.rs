@@ -1,10 +1,10 @@
-//! Tauri commands for loading and displaying slides.html in the webview.
+//! 웹뷰에서 slides.html을 불러오고 표시하는 Tauri 커맨드 모듈.
 //!
-//! Handles:
-//! - Reading slides.html from disk
-//! - Converting local image paths to Tauri asset protocol URLs
-//! - Listing library entries (previously generated slide sets)
-//! - Extracting metadata from segments.json
+//! 담당 기능:
+//! - 디스크에서 slides.html 읽기
+//! - 로컬 이미지 경로를 Tauri asset 프로토콜 URL로 변환
+//! - 라이브러리 항목(이전에 생성된 슬라이드 세트) 목록 조회
+//! - segments.json에서 메타데이터 추출
 
 use crate::config::ConfigState;
 use crate::settings::SettingsState;
@@ -13,24 +13,24 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use tauri::{State, Url};
 
-/// Summary info for a library entry shown in the dashboard.
+/// 대시보드에 표시되는 라이브러리 항목 요약 정보.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LibraryEntry {
-    /// Video ID (folder name)
+    /// 영상 ID (폴더명).
     pub video_id: String,
-    /// Absolute path to the entry folder
+    /// 항목 폴더의 절대 경로.
     pub path: String,
-    /// Whether slides.html exists
+    /// slides.html 존재 여부.
     pub has_slides: bool,
-    /// Video title from segments.json metadata (if available)
+    /// segments.json 메타데이터의 영상 제목 (있는 경우).
     pub title: Option<String>,
-    /// Thumbnail: first image path (asset protocol URL)
+    /// 썸네일: 첫 번째 이미지 경로 (asset 프로토콜 URL).
     pub thumbnail: Option<String>,
-    /// Number of slides
+    /// 슬라이드 수.
     pub slide_count: Option<usize>,
 }
 
-/// Minimal segment info used when reading segments.json for metadata.
+/// 메타데이터 조회 시 segments.json에서 읽는 최소 세그먼트 정보.
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 struct SegmentInfo {
@@ -44,7 +44,7 @@ struct SegmentInfo {
     pub timestamp: String,
 }
 
-/// Metadata extracted from a video entry's files.
+/// 영상 항목 파일에서 추출한 메타데이터.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SlidesMetadata {
     pub video_id: String,
@@ -55,7 +55,7 @@ pub struct SlidesMetadata {
     pub images: Vec<String>,
 }
 
-/// A single captured frame with its thumbnail URL and metadata.
+/// 썸네일 URL과 메타데이터가 포함된 단일 캡쳐 프레임.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CaptureFrame {
     pub index: usize,
@@ -65,7 +65,7 @@ pub struct CaptureFrame {
     pub thumbnail_url: String,
 }
 
-/// Result of get_capture_frames: frames + metadata about the capture.
+/// get_capture_frames 결과: 프레임 목록과 캡쳐 메타데이터.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CaptureFramesResult {
     pub video_id: String,
@@ -74,17 +74,16 @@ pub struct CaptureFramesResult {
     pub frames: Vec<CaptureFrame>,
 }
 
-/// Resolve the library path from settings, making relative paths absolute
-/// relative to the executable directory.
+/// 설정에서 라이브러리 경로를 가져오고, 상대 경로인 경우 실행 파일 디렉토리 기준 절대 경로로 변환한다.
 fn resolve_library_path(state: &SettingsState) -> Result<PathBuf, String> {
     let settings = state.0.lock().map_err(|e| e.to_string())?;
     Ok(ConfigState::resolved_library_path(&settings.library_path))
 }
 
-/// Percent-encode a path component for use in a URL.
+/// URL에 사용하기 위해 경로 구성 요소를 퍼센트 인코딩한다.
 ///
-/// Encodes spaces, non-ASCII, and other URI-unsafe characters while
-/// preserving `/` and `:` which are needed for Windows drive paths.
+/// 공백, 비ASCII 문자, 기타 URI 안전하지 않은 문자를 인코딩하되
+/// Windows 드라이브 경로에 필요한 `/`와 `:`는 유지한다.
 fn percent_encode_path(path_str: &str) -> String {
     let mut encoded = String::with_capacity(path_str.len());
     for ch in path_str.chars() {
@@ -107,17 +106,21 @@ fn percent_encode_path(path_str: &str) -> String {
     encoded
 }
 
-/// Convert a local file path to a Tauri asset protocol URL.
+/// 로컬 파일 경로를 Tauri asset 프로토콜 URL로 변환한다.
 ///
-/// In Tauri v2, local files can be accessed via `https://asset.localhost/<path>`.
-/// On Windows, paths are normalized to forward slashes and percent-encoded
-/// so that spaces and special characters in folder/file names work correctly.
+/// Tauri v2에서 로컬 파일은 `https://asset.localhost/<path>`로 접근할 수 있다.
+/// Windows에서는 경로를 순방향 슬래시로 정규화하고 퍼센트 인코딩해
+/// 폴더/파일명의 공백과 특수 문자가 올바르게 처리되도록 한다.
 fn to_asset_url(path: &Path) -> String {
     let abs = if path.is_absolute() {
         path.to_path_buf()
     } else {
-        std::env::current_dir()
-            .unwrap_or_default()
+        // 실행파일 디렉토리 기준으로 상대경로 해결 (config.rs와 동일한 방식)
+        // Tauri 앱에서 current_dir()은 실행 환경에 따라 달라질 수 있으므로 current_exe() 사용
+        std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_default())
             .join(path)
     };
 
@@ -131,11 +134,11 @@ fn to_asset_url(path: &Path) -> String {
     format!("https://asset.localhost/{}", encoded)
 }
 
-/// Rewrite image `src` attributes in slides.html to use asset protocol URLs.
+/// slides.html의 이미지 `src` 속성을 asset 프로토콜 URL로 재작성한다.
 ///
-/// Converts relative `src="images/..."` references to absolute asset:// URLs
-/// so the Tauri webview can load them. Handles both double-quoted and
-/// single-quoted src attributes, as well as srcset references.
+/// 상대 경로 `src="images/..."` 참조를 절대 asset:// URL로 변환해
+/// Tauri 웹뷰가 이미지를 로드할 수 있게 한다.
+/// 큰따옴표/작은따옴표 src 속성과 srcset 참조 모두 처리한다.
 fn rewrite_image_paths(html: &str, slides_dir: &Path) -> String {
     let images_dir = slides_dir.join("images");
     let asset_base = to_asset_url(&images_dir);
@@ -150,9 +153,9 @@ fn rewrite_image_paths(html: &str, slides_dir: &Path) -> String {
     result
 }
 
-/// Inject a `<base>` tag and CSP meta for correct asset resolution inside the
-/// iframe srcdoc context. This ensures any remaining relative URLs resolve
-/// correctly and the CSP allows loading from the asset protocol.
+/// iframe srcdoc 컨텍스트에서 올바른 asset 해석을 위해 `<base>` 태그와 CSP 메타를 삽입한다.
+/// 이를 통해 남은 상대 URL이 올바르게 해석되고
+/// CSP가 asset 프로토콜 로딩을 허용하도록 한다.
 fn inject_base_and_csp(html: &str, slides_dir: &Path) -> String {
     let base_url = to_asset_url(slides_dir);
 
@@ -192,10 +195,10 @@ fn inject_base_and_csp(html: &str, slides_dir: &Path) -> String {
     format!("{}\n{}", injection, html)
 }
 
-/// Load slides.html content for a given video ID, with image paths
-/// rewritten for Tauri webview rendering.
+/// 영상 ID에 해당하는 slides.html 내용을 불러오고,
+/// Tauri 웹뷰 렌더링을 위해 이미지 경로를 재작성한다.
 ///
-/// Returns the full HTML string ready to be injected into the webview.
+/// 웹뷰에 삽입할 준비가 된 전체 HTML 문자열을 반환한다.
 #[tauri::command]
 pub fn load_slides_html(
     state: State<'_, SettingsState>,
@@ -225,9 +228,19 @@ pub fn load_slides_html(
     Ok(final_html)
 }
 
-/// Get the absolute file path to slides.html for a given video ID.
+/// 라이브러리 절대경로를 반환한다.
+/// 프론트엔드에서 썸네일 asset URL 생성 시 사용.
+#[tauri::command]
+pub fn get_resolved_library_path(
+    state: State<'_, SettingsState>,
+) -> Result<String, String> {
+    let path = resolve_library_path(&state)?;
+    Ok(path.to_string_lossy().replace('\\', "/"))
+}
+
+/// 영상 ID에 해당하는 slides.html의 절대 파일 경로를 반환한다.
 ///
-/// Used by the frontend to open the file externally in the default browser.
+/// 프론트엔드에서 기본 브라우저로 파일을 외부 열기할 때 사용한다.
 #[tauri::command]
 pub fn get_slides_path(
     state: State<'_, SettingsState>,
@@ -247,7 +260,7 @@ pub fn get_slides_path(
     Ok(slides_path.to_string_lossy().to_string())
 }
 
-/// List all library entries (video folders) with metadata.
+/// 라이브러리의 모든 항목(영상 폴더)을 메타데이터와 함께 나열한다.
 #[tauri::command]
 pub fn list_library_entries(
     state: State<'_, SettingsState>,
@@ -360,10 +373,10 @@ pub fn list_library_entries(
     Ok(entries)
 }
 
-/// Open slides.html in the default external browser for a given video ID.
+/// 영상 ID에 해당하는 slides.html을 기본 외부 브라우저에서 연다.
 ///
-/// Uses the system's default application for .html files (typically a web browser).
-/// The standalone slides.html uses relative image paths so it works independently.
+/// .html 파일의 시스템 기본 애플리케이션(보통 웹 브라우저)을 사용한다.
+/// 독립형 slides.html은 상대 이미지 경로를 사용하므로 단독으로 동작한다.
 #[tauri::command]
 pub async fn open_slides_external(
     app: tauri::AppHandle,
@@ -394,10 +407,10 @@ pub async fn open_slides_external(
     Ok(())
 }
 
-/// Delete a library entry and all associated files (video, frames, slides.html).
+/// 라이브러리 항목과 모든 관련 파일(영상, 프레임, slides.html)을 삭제한다.
 ///
-/// Removes the entire video folder from the library directory.
-/// Returns Ok(()) on success, or an error message if deletion fails.
+/// 라이브러리 디렉토리에서 영상 폴더 전체를 제거한다.
+/// 성공 시 Ok(())를 반환하고, 삭제 실패 시 오류 메시지를 반환한다.
 #[tauri::command]
 pub fn delete_library_entry(
     state: State<'_, SettingsState>,
@@ -440,7 +453,7 @@ pub fn delete_library_entry(
     Ok(())
 }
 
-/// Get metadata for a specific video entry.
+/// 특정 영상 항목의 메타데이터를 반환한다.
 #[tauri::command]
 pub fn get_slides_metadata(
     state: State<'_, SettingsState>,
@@ -502,13 +515,13 @@ pub fn get_slides_metadata(
     })
 }
 
-/// Get captured frames for a video entry with thumbnail URLs and metadata.
+/// 영상 항목의 캡쳐 프레임을 썸네일 URL 및 메타데이터와 함께 반환한다.
 ///
-/// Reads segments.json to get frame data (index, image, timestamp, subtitle text),
-/// then builds asset protocol URLs for each frame's thumbnail image.
-/// Falls back to scanning the images/ directory if segments.json is missing.
+/// segments.json에서 프레임 데이터(인덱스, 이미지, 타임스탬프, 자막 텍스트)를 읽고
+/// 각 프레임의 썸네일 이미지에 대한 asset 프로토콜 URL을 생성한다.
+/// segments.json이 없으면 images/ 디렉토리 스캔으로 폴백한다.
 ///
-/// Used by the capture list component to display completed captures.
+/// 완료된 캡쳐를 표시하는 캡쳐 목록 컴포넌트에서 사용한다.
 #[tauri::command]
 pub fn get_capture_frames(
     state: State<'_, SettingsState>,
@@ -609,10 +622,10 @@ pub fn get_capture_frames(
     })
 }
 
-/// Extract a human-readable timestamp from an image filename.
+/// 이미지 파일명에서 사람이 읽기 쉬운 타임스탬프를 추출한다.
 ///
-/// Looks for patterns like "HH-MM-SS" in filenames such as
-/// "frame_0001_00-01-23.jpg" and converts to "00:01:23".
+/// "frame_0001_00-01-23.jpg" 같은 파일명에서 "HH-MM-SS" 패턴을 찾아
+/// "00:01:23" 형식으로 변환한다.
 fn extract_timestamp_from_filename(filename: &str) -> String {
     // Match pattern: digits-digits-digits (timestamp portion)
     let parts: Vec<&str> = filename.split('_').collect();
@@ -637,9 +650,9 @@ fn extract_timestamp_from_filename(filename: &str) -> String {
     String::new()
 }
 
-/// Open a library item's output directory in the system file explorer.
+/// 라이브러리 항목의 출력 디렉토리를 시스템 파일 탐색기에서 연다.
 ///
-/// Cross-platform: uses `explorer` on Windows, `open` on macOS, `xdg-open` on Linux.
+/// 크로스플랫폼: Windows는 `explorer`, macOS는 `open`, Linux는 `xdg-open`을 사용한다.
 #[tauri::command]
 pub fn open_folder(
     state: State<'_, SettingsState>,
@@ -658,7 +671,7 @@ pub fn open_folder(
     open_directory_in_explorer(&entry_dir)
 }
 
-/// Open any directory path in the system file explorer.
+/// 시스템 파일 탐색기에서 임의의 디렉토리 경로를 연다.
 fn open_directory_in_explorer(path: &Path) -> Result<(), String> {
     let path_str = path.to_string_lossy().to_string();
 
@@ -689,16 +702,16 @@ fn open_directory_in_explorer(path: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// Re-capture frames for an existing library item using a different capture mode.
+/// 다른 캡쳐 모드로 기존 라이브러리 항목의 프레임을 재캡쳐한다.
 ///
-/// This command:
-/// 1. Validates that the library entry exists
-/// 2. Finds a video file (mp4/mkv/webm) in the entry directory
-/// 3. Clears old captured frames from the images/ directory
-/// 4. Runs frame capture with the new options
-/// 5. Regenerates slides.html and segments.json
+/// 이 커맨드는 다음을 수행한다:
+/// 1. 라이브러리 항목 존재 확인
+/// 2. 항목 디렉토리에서 영상 파일(mp4/mkv/webm) 탐색
+/// 3. images/ 디렉토리에서 기존 캡쳐 프레임 삭제
+/// 4. 새 옵션으로 프레임 캡쳐 실행
+/// 5. slides.html과 segments.json 재생성
 ///
-/// Returns the number of newly captured frames.
+/// 새로 캡쳐된 프레임 수를 반환한다.
 #[tauri::command]
 pub async fn recapture_library_item(
     state: tauri::State<'_, SettingsState>,
@@ -816,19 +829,19 @@ pub async fn recapture_library_item(
     result
 }
 
-/// Result of a re-capture operation.
+/// 재캡쳐 작업 결과.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecaptureResult {
-    /// Number of frames captured
+    /// 캡쳐된 프레임 수.
     pub frame_count: usize,
-    /// The capture mode that was used
+    /// 사용된 캡쳐 모드.
     pub capture_mode: String,
 }
 
-/// Check whether a video ID already exists in the library (has a folder).
+/// 영상 ID가 라이브러리에 이미 존재하는지(폴더가 있는지) 확인한다.
 ///
-/// Used by the frontend to detect duplicate submissions before adding to the queue.
-/// Returns `true` if a directory named `video_id` exists inside the library path.
+/// 프론트엔드에서 큐에 추가하기 전 중복 제출을 감지할 때 사용한다.
+/// 라이브러리 경로 내에 `video_id`라는 디렉토리가 있으면 `true`를 반환한다.
 #[tauri::command]
 pub fn check_video_exists(
     state: State<'_, SettingsState>,
@@ -846,7 +859,7 @@ pub fn check_video_exists(
     Ok(entry_dir.exists() && entry_dir.is_dir())
 }
 
-/// Check whether a library item has a source video file available for re-capture.
+/// 라이브러리 항목에 재캡쳐 가능한 원본 영상 파일이 있는지 확인한다.
 #[tauri::command]
 pub fn check_recapture_available(
     state: State<'_, SettingsState>,
@@ -862,7 +875,7 @@ pub fn check_recapture_available(
     Ok(find_video_file(&entry_dir).is_some())
 }
 
-/// Find a video file (mp4, mkv, webm) in the given directory.
+/// 주어진 디렉토리에서 영상 파일(mp4, mkv, webm)을 찾는다.
 fn find_video_file(dir: &Path) -> Option<PathBuf> {
     let extensions = ["mp4", "mkv", "webm", "avi", "mov"];
     if let Ok(entries) = fs::read_dir(dir) {

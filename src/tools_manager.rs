@@ -1,8 +1,8 @@
-//! Tools manager — auto-downloads yt-dlp and ffmpeg on first run.
+//! 도구 관리자 — 최초 실행 시 yt-dlp와 ffmpeg을 자동으로 다운로드한다.
 //!
-//! On startup, call [`setup_tools`] to ensure both binaries exist in the
-//! `tools/` directory next to the executable. Progress is emitted via
-//! `tools:status` Tauri events so the frontend can show a loading overlay.
+//! 앱 시작 시 [`setup_tools`]를 호출하면 두 바이너리가 실행 파일 옆
+//! `tools/` 디렉토리에 존재하는지 확인하고 없으면 다운로드한다.
+//! 진행 상황은 `tools:status` Tauri 이벤트로 프론트엔드에 전송되어 로딩 오버레이를 표시한다.
 
 use std::io::Write;
 use std::path::PathBuf;
@@ -20,7 +20,7 @@ const FFMPEG_ZIP_URL: &str =
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
-/// Aggregate status of both tools after [`setup_tools`] completes.
+/// [`setup_tools`] 완료 후 두 도구의 종합 상태.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolsStatus {
     pub ytdlp_ready: bool,
@@ -30,7 +30,7 @@ pub struct ToolsStatus {
     pub ytdlp_version: Option<String>,
 }
 
-/// Result of an update-availability check for yt-dlp.
+/// yt-dlp 업데이트 가용성 확인 결과.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateInfo {
     pub update_available: bool,
@@ -57,7 +57,7 @@ fn emit_progress(app: &AppHandle, tool: &str, status: &str, progress: u8, messag
 
 // ─── Directory helpers ────────────────────────────────────────────────────────
 
-/// Returns the `tools/` directory next to the running executable.
+/// 실행 중인 실행 파일 옆 `tools/` 디렉토리 경로를 반환한다.
 pub fn tools_dir() -> PathBuf {
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
@@ -67,12 +67,12 @@ pub fn tools_dir() -> PathBuf {
     PathBuf::from("tools")
 }
 
-/// Returns the full path to `name` inside `tools/`.
+/// `tools/` 내부의 `name` 전체 경로를 반환한다.
 pub fn tool_path(name: &str) -> PathBuf {
     tools_dir().join(name)
 }
 
-/// Returns `true` if the binary exists inside `tools/`.
+/// 바이너리가 `tools/` 내에 존재하면 `true`를 반환한다.
 pub fn tool_exists(name: &str) -> bool {
     tool_path(name).exists()
 }
@@ -96,9 +96,9 @@ fn write_stored_version(version: &str) {
 
 // ─── GitHub latest-release tag helper ────────────────────────────────────────
 
-/// Fetch the latest release tag name for a GitHub repo.
+/// GitHub 저장소의 최신 릴리즈 태그 이름을 가져온다.
 ///
-/// Uses the GitHub redirect: `releases/latest` → `releases/tag/<tag>`.
+/// GitHub 리다이렉트(`releases/latest` → `releases/tag/<tag>`)를 이용한다.
 async fn fetch_latest_tag(owner: &str, repo: &str) -> Result<String, String> {
     let url = format!("https://github.com/{owner}/{repo}/releases/latest");
     let client = reqwest::Client::builder()
@@ -125,7 +125,7 @@ async fn fetch_latest_tag(owner: &str, repo: &str) -> Result<String, String> {
 
 // ─── Download helper ──────────────────────────────────────────────────────────
 
-/// Download a URL to `dest`, emitting `tools:status` progress events.
+/// URL을 `dest`에 다운로드하면서 `tools:status` 진행 이벤트를 발송한다.
 async fn download_to_file(
     app: &AppHandle,
     tool_name: &str,
@@ -189,8 +189,8 @@ async fn download_to_file(
 
 // ─── yt-dlp ───────────────────────────────────────────────────────────────────
 
-/// Ensure `yt-dlp.exe` exists in `tools/`. Downloads if missing.
-/// Returns the path to the binary.
+/// `tools/`에 `yt-dlp.exe`가 있는지 확인하고, 없으면 다운로드한다.
+/// 바이너리 경로를 반환한다.
 pub async fn ensure_ytdlp(app: &AppHandle) -> Result<PathBuf, String> {
     let exe_name = "yt-dlp.exe";
     let dest = tool_path(exe_name);
@@ -220,8 +220,8 @@ pub async fn ensure_ytdlp(app: &AppHandle) -> Result<PathBuf, String> {
 
 // ─── ffmpeg ───────────────────────────────────────────────────────────────────
 
-/// Ensure `ffmpeg.exe` and `ffprobe.exe` exist in `tools/`. Downloads and extracts if missing.
-/// Returns the path to `ffmpeg.exe`.
+/// `tools/`에 `ffmpeg.exe`와 `ffprobe.exe`가 있는지 확인하고, 없으면 다운로드·압축 해제한다.
+/// `ffmpeg.exe` 경로를 반환한다.
 pub async fn ensure_ffmpeg(app: &AppHandle) -> Result<PathBuf, String> {
     let ffmpeg_dest = tool_path("ffmpeg.exe");
     let ffprobe_dest = tool_path("ffprobe.exe");
@@ -255,9 +255,9 @@ pub async fn ensure_ffmpeg(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(ffmpeg_dest)
 }
 
-/// Extract multiple binaries from `*/bin/<name>` inside the BtbN zip archive.
+/// BtbN zip 아카이브 내 `*/bin/<name>` 경로에서 여러 바이너리를 추출한다.
 ///
-/// `targets` is a slice of `(binary_name, destination_path)` pairs.
+/// `targets`는 `(binary_name, destination_path)` 쌍의 슬라이스다.
 fn extract_binaries_from_zip(
     zip_path: &std::path::Path,
     targets: &[(&str, &std::path::Path)],
@@ -316,9 +316,9 @@ fn extract_binaries_from_zip(
 
 // ─── Tauri commands ───────────────────────────────────────────────────────────
 
-/// Check all tools and download missing ones. Emits `tools:status` events.
+/// 모든 도구를 확인하고 없는 것을 다운로드한다. `tools:status` 이벤트를 발송한다.
 ///
-/// Called at app startup from the frontend.
+/// 앱 시작 시 프론트엔드에서 호출된다.
 #[tauri::command]
 pub async fn setup_tools(app: AppHandle) -> Result<ToolsStatus, String> {
     // Ensure both tools exist (downloads happen in sequence to avoid saturating
@@ -343,7 +343,7 @@ pub async fn setup_tools(app: AppHandle) -> Result<ToolsStatus, String> {
     })
 }
 
-/// Check whether a newer yt-dlp release is available on GitHub.
+/// GitHub에 더 새로운 yt-dlp 릴리즈가 있는지 확인한다.
 #[tauri::command]
 pub async fn check_ytdlp_update(_app: AppHandle) -> Result<UpdateInfo, String> {
     let current = read_stored_version();
@@ -363,7 +363,7 @@ pub async fn check_ytdlp_update(_app: AppHandle) -> Result<UpdateInfo, String> {
     })
 }
 
-/// Update yt-dlp to the latest version.
+/// yt-dlp를 최신 버전으로 업데이트한다.
 #[tauri::command]
 pub async fn update_ytdlp(app: AppHandle) -> Result<(), String> {
     let dest = tool_path("yt-dlp.exe");
@@ -382,14 +382,14 @@ pub async fn update_ytdlp(app: AppHandle) -> Result<(), String> {
 
 // ─── Path resolution helpers (used by metadata.rs / capture.rs) ──────────────
 
-/// Resolve yt-dlp: tools/ first, then next to exe, then PATH.
+/// yt-dlp 경로를 결정한다: tools/ → 실행 파일 옆 → 시스템 PATH 순으로 탐색.
 pub fn resolve_ytdlp_path() -> PathBuf {
-    // 1. tools/ directory
+    // 1. tools/ 디렉토리
     let in_tools = tool_path("yt-dlp.exe");
     if in_tools.exists() {
         return in_tools;
     }
-    // 2. Next to exe (backward compat / portable)
+    // 2. 실행 파일 옆 (하위 호환 / 포터블)
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
             let candidate = dir.join(if cfg!(windows) { "yt-dlp.exe" } else { "yt-dlp" });
@@ -398,18 +398,18 @@ pub fn resolve_ytdlp_path() -> PathBuf {
             }
         }
     }
-    // 3. System PATH
+    // 3. 시스템 PATH
     PathBuf::from(if cfg!(windows) { "yt-dlp.exe" } else { "yt-dlp" })
 }
 
-/// Resolve ffmpeg: tools/ first, then next to exe, then PATH.
+/// ffmpeg 경로를 결정한다: tools/ → 실행 파일 옆 → 시스템 PATH 순으로 탐색.
 pub fn resolve_ffmpeg_path() -> PathBuf {
-    // 1. tools/ directory
+    // 1. tools/ 디렉토리
     let in_tools = tool_path("ffmpeg.exe");
     if in_tools.exists() {
         return in_tools;
     }
-    // 2. Next to exe (backward compat / portable)
+    // 2. 실행 파일 옆 (하위 호환 / 포터블)
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
             let candidate = dir.join(if cfg!(windows) { "ffmpeg.exe" } else { "ffmpeg" });
@@ -418,18 +418,18 @@ pub fn resolve_ffmpeg_path() -> PathBuf {
             }
         }
     }
-    // 3. System PATH
+    // 3. 시스템 PATH
     PathBuf::from("ffmpeg")
 }
 
-/// Resolve ffprobe: tools/ first, then next to exe, then PATH.
+/// ffprobe 경로를 결정한다: tools/ → 실행 파일 옆 → 시스템 PATH 순으로 탐색.
 pub fn resolve_ffprobe_path() -> PathBuf {
-    // 1. tools/ directory
+    // 1. tools/ 디렉토리
     let in_tools = tool_path("ffprobe.exe");
     if in_tools.exists() {
         return in_tools;
     }
-    // 2. Next to exe (backward compat / portable)
+    // 2. 실행 파일 옆 (하위 호환 / 포터블)
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
             let candidate = dir.join(if cfg!(windows) { "ffprobe.exe" } else { "ffprobe" });
@@ -438,6 +438,6 @@ pub fn resolve_ffprobe_path() -> PathBuf {
             }
         }
     }
-    // 3. System PATH
+    // 3. 시스템 PATH
     PathBuf::from("ffprobe")
 }

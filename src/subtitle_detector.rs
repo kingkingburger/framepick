@@ -1,7 +1,7 @@
-//! Subtitle availability detection for YouTube videos.
+//! YouTube 영상 자막 가용 여부 감지 모듈.
 //!
-//! Uses yt-dlp to query whether a YouTube video has downloadable subtitles
-//! (manual or auto-generated) and returns the result to the frontend.
+//! yt-dlp로 YouTube 영상에 다운로드 가능한 자막(수동 또는 자동 생성)이
+//! 있는지 확인하고 결과를 프론트엔드에 반환한다.
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -9,20 +9,20 @@ use std::process::Command;
 
 use crate::cmd_util::HideWindow;
 
-/// Result of subtitle availability check.
+/// 자막 가용 여부 확인 결과.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubtitleCheckResult {
-    /// Whether any subtitles (manual or auto) are available.
+    /// 수동/자동 자막이 하나라도 있는지 여부.
     pub has_subtitles: bool,
-    /// Whether manual (human-created) subtitles are available.
+    /// 수동(사람이 작성한) 자막 존재 여부.
     pub has_manual_subtitles: bool,
-    /// Whether auto-generated subtitles are available.
+    /// 자동 생성 자막 존재 여부.
     pub has_auto_subtitles: bool,
-    /// List of available manual subtitle language codes (e.g. ["en", "ko"]).
+    /// 사용 가능한 수동 자막 언어 코드 목록 (예: ["en", "ko"]).
     pub manual_languages: Vec<String>,
-    /// List of available auto-generated subtitle language codes.
+    /// 사용 가능한 자동 생성 자막 언어 코드 목록.
     pub auto_languages: Vec<String>,
-    /// Error message if the check failed (empty on success).
+    /// 확인 실패 시 오류 메시지 (성공 시 빈 문자열).
     pub error: String,
 }
 
@@ -55,15 +55,15 @@ impl SubtitleCheckResult {
     }
 }
 
-/// Resolve the path to yt-dlp executable via tools_manager.
+/// tools_manager를 통해 yt-dlp 실행 파일 경로를 반환한다.
 pub fn resolve_ytdlp_path() -> PathBuf {
     crate::tools_manager::resolve_ytdlp_path()
 }
 
-/// Check subtitle availability for a YouTube video using yt-dlp.
+/// yt-dlp로 YouTube 영상의 자막 가용 여부를 확인한다.
 ///
-/// Runs `yt-dlp --list-subs --skip-download <url>` and parses the output
-/// to determine what subtitles are available.
+/// `yt-dlp --list-subs --skip-download <url>`을 실행하고 출력을 파싱해
+/// 사용 가능한 자막을 결정한다.
 pub fn check_subtitles(video_url: &str) -> SubtitleCheckResult {
     let ytdlp_path = resolve_ytdlp_path();
 
@@ -97,9 +97,9 @@ pub fn check_subtitles(video_url: &str) -> SubtitleCheckResult {
     parse_subtitle_output(&stdout)
 }
 
-/// Parse yt-dlp --list-subs output to extract subtitle information.
+/// yt-dlp --list-subs 출력을 파싱해 자막 정보를 추출한다.
 ///
-/// The output format has sections like:
+/// 출력 형식은 다음과 같은 섹션을 포함한다:
 /// ```text
 /// [info] Available subtitles for VIDEO_ID:
 /// Language   Name         Formats
@@ -112,7 +112,7 @@ pub fn check_subtitles(video_url: &str) -> SubtitleCheckResult {
 /// ...
 /// ```
 ///
-/// Or if no subtitles:
+/// 자막이 없는 경우:
 /// ```text
 /// [info] No subtitles available for VIDEO_ID
 /// ```
@@ -207,10 +207,10 @@ pub fn parse_subtitle_output(output: &str) -> SubtitleCheckResult {
     SubtitleCheckResult::success(has_manual, has_auto, manual_languages, auto_languages)
 }
 
-/// Extract a language code from a subtitle list line.
+/// 자막 목록 줄에서 언어 코드를 추출한다.
 ///
-/// Lines look like: `ko         Korean       vtt, ttml, srv3, srv2, srv1, json3`
-/// The language code is the first whitespace-delimited token.
+/// 줄 형식: `ko         Korean       vtt, ttml, srv3, srv2, srv1, json3`
+/// 언어 코드는 공백으로 구분된 첫 번째 토큰이다.
 fn extract_language_code(line: &str) -> Option<String> {
     let trimmed = line.trim();
     if trimmed.is_empty() {
@@ -233,10 +233,10 @@ fn extract_language_code(line: &str) -> Option<String> {
     }
 }
 
-/// Tauri command: check if a YouTube video has subtitles.
+/// Tauri 커맨드: YouTube 영상의 자막 존재 여부를 확인한다.
 ///
-/// Takes a video URL (or video ID) and returns subtitle availability info.
-/// This is an async command to avoid blocking the UI thread.
+/// 영상 URL(또는 영상 ID)을 받아 자막 가용 정보를 반환한다.
+/// UI 스레드 블로킹을 방지하기 위해 비동기 커맨드로 구현한다.
 #[tauri::command]
 pub async fn check_subtitle_availability(url: String) -> Result<SubtitleCheckResult, String> {
     // Run the blocking yt-dlp call on a background thread

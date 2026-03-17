@@ -73,7 +73,8 @@
 
 body {
   font-family: var(--fp-font-family);
-  background-color: var(--bg-primary);
+  background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+  background-attachment: fixed;
   color: var(--text-primary);
   line-height: 1.6;
   min-height: 100vh;
@@ -222,39 +223,91 @@ body {
   box-shadow: 0 0 0 2px var(--error-bg);
 }
 
-/* ---- Dashboard Container ---- */
+/* ---- Dashboard Container (사이드바 + 메인 레이아웃) ---- */
 
 .dashboard {
-  max-width: 840px;
-  margin: 0 auto;
-  padding: 1.5rem 1.5rem 3rem;
-  min-height: 100vh;
   display: flex;
-  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
 }
 
-.dashboard-header {
+/* ---- 사이드바 ---- */
+
+.app-sidebar {
+  width: 272px;
+  min-width: 240px;
+  background: var(--fp-glass-bg);
+  backdrop-filter: blur(var(--fp-glass-blur-strong));
+  -webkit-backdrop-filter: blur(var(--fp-glass-blur-strong));
+  border-right: 1px solid var(--fp-glass-border);
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1.5rem;
+  flex-direction: column;
+  overflow: hidden;
   flex-shrink: 0;
 }
 
-.dashboard-brand {
+.sidebar-brand {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
+  gap: 0.5rem;
+  padding: 1rem 1rem 0.75rem;
+  border-bottom: 1px solid var(--fp-glass-border);
+}
+
+.sidebar-brand-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--fp-text-heading);
+  letter-spacing: -0.01em;
 }
 
 .brand-icon {
   flex-shrink: 0;
 }
 
+.sidebar-library {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem;
+}
+
+.sidebar-library::-webkit-scrollbar { width: 5px; }
+.sidebar-library::-webkit-scrollbar-track { background: transparent; }
+.sidebar-library::-webkit-scrollbar-thumb { background: var(--fp-bg-scrollbar-thumb); border-radius: 3px; }
+
+/* ---- 메인 영역 ---- */
+
+.app-main {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-main::-webkit-scrollbar { width: 6px; }
+.app-main::-webkit-scrollbar-track { background: transparent; }
+.app-main::-webkit-scrollbar-thumb { background: var(--fp-bg-scrollbar-thumb); border-radius: 3px; }
+
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid var(--fp-glass-border);
+  background: var(--fp-glass-bg);
+  backdrop-filter: blur(var(--fp-glass-blur));
+  -webkit-backdrop-filter: blur(var(--fp-glass-blur));
+  flex-shrink: 0;
+}
+
+.sidebar-toggle-btn {
+  display: none;
+}
+
 .dashboard-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--text-primary);
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--fp-text-heading);
   letter-spacing: -0.01em;
 }
 
@@ -264,19 +317,67 @@ body {
   flex-shrink: 0;
 }
 
-/* ---- Workflow Area (groups input + queue + capture list) ---- */
+/* ---- Workflow Area ---- */
 
 .workflow-area {
-  flex-shrink: 0;
-  margin-bottom: 0.5rem;
+  flex: 1;
+  padding: 1.25rem 1.5rem 3rem;
+  max-width: 840px;
+}
+
+/* ---- 사이드바 라이브러리 그리드를 리스트로 변경 ---- */
+
+.sidebar-library .library-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sidebar-library .library-card {
+  border-radius: var(--fp-radius);
+}
+
+.sidebar-library .library-card-thumb {
+  height: 100px;
+}
+
+.sidebar-library .library-empty {
+  padding: 2rem 0.5rem;
+  font-size: 0.8rem;
+}
+
+/* ---- 반응형: 모바일에서 사이드바 토글 ---- */
+
+@media (max-width: 768px) {
+  .app-sidebar {
+    position: fixed;
+    left: -280px;
+    top: 0;
+    height: 100vh;
+    z-index: 900;
+    transition: left 0.25s ease;
+    box-shadow: none;
+  }
+  .app-sidebar.open {
+    left: 0;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
+  }
+  .sidebar-toggle-btn {
+    display: flex;
+  }
+  .workflow-area {
+    padding: 1rem;
+  }
 }
 
 /* ---- Input Panel ---- */
 
 .input-panel {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  background: var(--fp-glass-bg-strong);
+  backdrop-filter: blur(var(--fp-glass-blur));
+  -webkit-backdrop-filter: blur(var(--fp-glass-blur));
+  border: 1px solid var(--fp-glass-border);
+  border-radius: var(--fp-radius-lg);
   padding: 1.25rem;
   margin-bottom: 1.25rem;
   flex-shrink: 0;
@@ -478,6 +579,7 @@ body {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  margin-left: auto;
 }
 
 /* ---- Form Input (text) ---- */
@@ -550,8 +652,10 @@ body {
   width: 90%;
   max-width: 520px;
   max-height: 85vh;
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border);
+  background: var(--fp-glass-bg-strong);
+  backdrop-filter: blur(var(--fp-glass-blur-strong));
+  -webkit-backdrop-filter: blur(var(--fp-glass-blur-strong));
+  border: 1px solid var(--fp-glass-border);
   border-radius: var(--radius);
   box-shadow: 0 16px 48px var(--shadow-deep);
   overflow: hidden;
@@ -1433,9 +1537,6 @@ body {
    ============================================ */
 
 .library-section {
-  margin-top: 1.5rem;
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--border);
   flex: 1;
   min-height: 0;
 }
@@ -1444,7 +1545,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .library-header-actions {
@@ -1480,9 +1581,11 @@ body {
 }
 
 .library-card {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  background: var(--fp-glass-bg-strong);
+  backdrop-filter: blur(var(--fp-glass-blur));
+  -webkit-backdrop-filter: blur(var(--fp-glass-blur));
+  border: 1px solid var(--fp-glass-border);
+  border-radius: var(--fp-radius-lg);
   overflow: hidden;
   cursor: pointer;
   transition: border-color var(--transition), transform var(--transition), box-shadow var(--transition);

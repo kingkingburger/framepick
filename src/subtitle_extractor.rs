@@ -1,13 +1,12 @@
-//! Subtitle extraction module for YouTube videos.
+//! YouTube 영상 자막 추출 모듈.
 //!
-//! Downloads subtitles using yt-dlp with language priority (Korean first,
-//! English fallback), parses SRT/VTT subtitle files, and extracts timestamps
-//! for subtitle-based frame capture.
+//! yt-dlp로 언어 우선순위(한국어 우선, 영어 폴백)에 따라 자막을 다운로드하고,
+//! SRT/VTT 자막 파일을 파싱해 자막 기반 프레임 캡쳐용 타임스탬프를 추출한다.
 //!
-//! Language priority order:
-//! 1. Korean (`ko`) — manual subtitles preferred over auto-generated
-//! 2. English (`en`) — manual subtitles preferred over auto-generated
-//! 3. Any available language — last resort fallback
+//! 언어 우선순위:
+//! 1. 한국어(`ko`) — 수동 자막을 자동 생성 자막보다 우선
+//! 2. 영어(`en`) — 수동 자막을 자동 생성 자막보다 우선
+//! 3. 기타 가용 언어 — 최후 폴백
 
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -16,46 +15,46 @@ use std::process::Command;
 use crate::cmd_util::HideWindow;
 use crate::subtitle_detector::{resolve_ytdlp_path, SubtitleCheckResult};
 
-/// Default language priority: Korean first, then English.
+/// 기본 언어 우선순위: 한국어 우선, 그 다음 영어.
 pub const LANGUAGE_PRIORITY: &[&str] = &["ko", "en"];
 
-/// Result of subtitle language selection.
+/// 자막 언어 선택 결과.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubtitleLanguageSelection {
-    /// The language code selected (e.g., "ko", "en").
+    /// 선택된 언어 코드 (예: "ko", "en").
     pub language: String,
-    /// Whether this is a manual (human-created) subtitle.
+    /// 수동(사람이 작성) 자막 여부.
     pub is_manual: bool,
-    /// Whether this is the preferred language or a fallback.
+    /// 선호 언어인지 폴백인지 여부.
     pub is_preferred: bool,
-    /// Human-readable description of the selection (for logging).
+    /// 로깅용 선택 결과 설명.
     pub description: String,
-    /// i18n key describing the selection result.
+    /// 선택 결과를 설명하는 i18n 키.
     pub i18n_key: String,
 }
 
-/// A single parsed subtitle cue with start/end timestamps.
+/// 시작/종료 타임스탬프가 있는 단일 파싱된 자막 큐.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubtitleCue {
-    /// Start time in seconds.
+    /// 시작 시간(초).
     pub start_secs: f64,
-    /// End time in seconds.
+    /// 종료 시간(초).
     pub end_secs: f64,
-    /// Subtitle text content.
+    /// 자막 텍스트 내용.
     pub text: String,
 }
 
-/// Result of subtitle extraction.
+/// 자막 추출 결과.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubtitleExtractionResult {
-    /// The language that was extracted.
+    /// 추출된 언어.
     pub language: SubtitleLanguageSelection,
-    /// Parsed subtitle cues with timestamps.
+    /// 타임스탬프가 포함된 파싱된 자막 큐.
     pub cues: Vec<SubtitleCue>,
-    /// Path to the downloaded subtitle file (if retained).
+    /// 다운로드된 자막 파일 경로 (보존된 경우).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subtitle_file: Option<String>,
-    /// Error message if extraction failed (empty on success).
+    /// 추출 실패 시 오류 메시지 (성공 시 빈 문자열).
     pub error: String,
 }
 
@@ -85,19 +84,18 @@ impl SubtitleExtractionResult {
     }
 }
 
-/// Select the best subtitle language from available options.
+/// 가용 옵션 중 최적의 자막 언어를 선택한다.
 ///
-/// Priority logic:
-/// 1. Korean manual subtitles (best quality)
-/// 2. Korean auto-generated subtitles
-/// 3. English manual subtitles
-/// 4. English auto-generated subtitles
-/// 5. First available manual subtitle in any language
-/// 6. First available auto-generated subtitle in any language
-/// 7. None — no subtitles available
+/// 우선순위 로직:
+/// 1. 한국어 수동 자막 (최상위)
+/// 2. 한국어 자동 생성 자막
+/// 3. 영어 수동 자막
+/// 4. 영어 자동 생성 자막
+/// 5. 임의 언어의 첫 번째 수동 자막
+/// 6. 임의 언어의 첫 번째 자동 생성 자막
+/// 7. None — 자막 없음
 ///
-/// Manual subtitles are preferred over auto-generated because they tend to
-/// have more accurate timing for frame capture.
+/// 수동 자막은 프레임 캡쳐 타이밍 정확도가 높아 자동 생성 자막보다 우선된다.
 pub fn select_best_subtitle_language(
     check: &SubtitleCheckResult,
 ) -> Option<SubtitleLanguageSelection> {
@@ -186,14 +184,14 @@ pub fn select_best_subtitle_language(
     None
 }
 
-/// Check if a language code matches a target language.
+/// 언어 코드가 대상 언어와 일치하는지 확인한다.
 ///
-/// Handles variants like "ko", "ko-KR", "en", "en-US", "en-GB", etc.
+/// "ko", "ko-KR", "en", "en-US", "en-GB" 등의 변형을 처리한다.
 fn language_matches(code: &str, target: &str) -> bool {
     code == target || code.starts_with(&format!("{}-", target))
 }
 
-/// Get a display name for a language code.
+/// 언어 코드의 표시 이름을 반환한다.
 fn lang_display_name(code: &str) -> &str {
     match code {
         "ko" => "Korean",
@@ -208,12 +206,12 @@ fn lang_display_name(code: &str) -> &str {
     }
 }
 
-/// Download subtitles for a YouTube video using yt-dlp.
+/// yt-dlp로 YouTube 영상의 자막을 다운로드한다.
 ///
-/// Uses the language selection to determine which subtitle track to download.
-/// Downloads in SRT format for easy parsing.
+/// 언어 선택 결과에 따라 다운로드할 자막 트랙을 결정하고
+/// 파싱이 쉬운 SRT 형식으로 다운로드한다.
 ///
-/// Returns the path to the downloaded subtitle file.
+/// 다운로드된 자막 파일 경로를 반환한다.
 pub fn download_subtitles(
     video_url: &str,
     output_dir: &Path,
@@ -270,9 +268,9 @@ pub fn download_subtitles(
     find_subtitle_file(output_dir, sub_lang)
 }
 
-/// Find the downloaded subtitle file in the output directory.
+/// 출력 디렉토리에서 다운로드된 자막 파일을 찾는다.
 ///
-/// yt-dlp names files as `{video_id}.{lang}.srt` or similar patterns.
+/// yt-dlp는 `{video_id}.{lang}.srt` 등의 패턴으로 파일을 명명한다.
 fn find_subtitle_file(dir: &Path, lang: &str) -> Result<PathBuf, String> {
     let entries = std::fs::read_dir(dir)
         .map_err(|e| format!("Failed to read output dir: {e}"))?;
@@ -344,9 +342,9 @@ fn find_subtitle_file(dir: &Path, lang: &str) -> Result<PathBuf, String> {
     ))
 }
 
-/// Parse an SRT subtitle file into subtitle cues.
+/// SRT 자막 파일을 자막 큐로 파싱한다.
 ///
-/// SRT format:
+/// SRT 형식:
 /// ```text
 /// 1
 /// 00:00:01,000 --> 00:00:04,500
@@ -363,7 +361,7 @@ pub fn parse_srt_file(path: &Path) -> Result<Vec<SubtitleCue>, String> {
     parse_srt(&content)
 }
 
-/// Parse SRT format subtitle content into cues.
+/// SRT 형식 자막 문자열을 큐로 파싱한다.
 pub fn parse_srt(content: &str) -> Result<Vec<SubtitleCue>, String> {
     let mut cues = Vec::new();
     let mut lines = content.lines().peekable();
@@ -436,10 +434,10 @@ pub fn parse_srt(content: &str) -> Result<Vec<SubtitleCue>, String> {
     Ok(cues)
 }
 
-/// Parse a VTT/WebVTT subtitle file into cues.
+/// VTT/WebVTT 자막 파일을 큐로 파싱한다.
 ///
-/// VTT is similar to SRT but uses '.' instead of ',' for milliseconds
-/// and may have a "WEBVTT" header.
+/// VTT는 SRT와 유사하지만 밀리초 구분자로 ','가 아닌 '.'을 사용하고
+/// "WEBVTT" 헤더가 있을 수 있다.
 pub fn parse_vtt_file(path: &Path) -> Result<Vec<SubtitleCue>, String> {
     let content = std::fs::read_to_string(path)
         .map_err(|e| format!("Failed to read subtitle file: {e}"))?;
@@ -447,7 +445,7 @@ pub fn parse_vtt_file(path: &Path) -> Result<Vec<SubtitleCue>, String> {
     parse_vtt(&content)
 }
 
-/// Parse VTT format subtitle content into cues.
+/// VTT 형식 자막 문자열을 큐로 파싱한다.
 pub fn parse_vtt(content: &str) -> Result<Vec<SubtitleCue>, String> {
     // Convert VTT to SRT-like format by replacing '.' with ',' in timestamps
     // and stripping the WEBVTT header
@@ -488,7 +486,7 @@ pub fn parse_vtt(content: &str) -> Result<Vec<SubtitleCue>, String> {
     parse_srt(&normalized)
 }
 
-/// Strip VTT-specific HTML-like tags from subtitle text.
+/// VTT 자막 텍스트에서 HTML 유사 태그를 제거한다.
 fn strip_vtt_tags(text: &str) -> String {
     let mut result = String::with_capacity(text.len());
     let mut in_tag = false;
@@ -506,7 +504,7 @@ fn strip_vtt_tags(text: &str) -> String {
     result
 }
 
-/// Parse an SRT timestamp string (e.g., "00:01:23,456") into seconds.
+/// SRT 타임스탬프 문자열(예: "00:01:23,456")을 초 단위로 변환한다.
 fn parse_srt_timestamp(ts: &str) -> Option<f64> {
     // Format: HH:MM:SS,mmm or HH:MM:SS.mmm
     let ts = ts.trim();
@@ -528,10 +526,10 @@ fn parse_srt_timestamp(ts: &str) -> Option<f64> {
     Some(hours * 3600.0 + minutes * 60.0 + seconds + millis / 1000.0)
 }
 
-/// Extract subtitle timestamps for frame capture.
+/// 프레임 캡쳐용 자막 타임스탬프를 추출한다.
 ///
-/// Returns deduplicated start times from subtitle cues, suitable for
-/// use as frame capture timestamps. Adjacent cues within 0.5s are merged.
+/// 자막 큐에서 중복 제거된 시작 시간 목록을 반환한다.
+/// 0.5초 이내의 인접한 큐는 병합된다.
 pub fn extract_capture_timestamps(cues: &[SubtitleCue]) -> Vec<f64> {
     let mut timestamps: Vec<f64> = Vec::with_capacity(cues.len());
 
@@ -548,14 +546,14 @@ pub fn extract_capture_timestamps(cues: &[SubtitleCue]) -> Vec<f64> {
     timestamps
 }
 
-/// Full subtitle extraction pipeline: check → select language → download → parse.
+/// 자막 추출 전체 파이프라인: 언어 선택 → 다운로드 → 파싱.
 ///
-/// This is the main entry point for subtitle-based frame capture.
-/// It performs the full pipeline:
-/// 1. Use existing subtitle check result to select best language (ko > en > other)
-/// 2. Download subtitles using yt-dlp
-/// 3. Parse the downloaded subtitle file
-/// 4. Return cues with timestamps
+/// 자막 기반 프레임 캡쳐의 주 진입점이다.
+/// 전체 파이프라인을 수행한다:
+/// 1. 기존 자막 확인 결과로 최적 언어 선택 (ko > en > 기타)
+/// 2. yt-dlp로 자막 다운로드
+/// 3. 다운로드된 자막 파일 파싱
+/// 4. 타임스탬프 포함 큐 반환
 pub fn extract_subtitles(
     video_url: &str,
     output_dir: &Path,
@@ -619,10 +617,10 @@ pub fn extract_subtitles(
     }
 }
 
-/// Tauri command: extract subtitles for a video URL.
+/// Tauri 커맨드: 영상 URL의 자막을 추출한다.
 ///
-/// Checks subtitle availability, selects the best language (Korean priority),
-/// downloads and parses the subtitle file.
+/// 자막 가용 여부를 확인하고, 최적 언어(한국어 우선)를 선택한 뒤
+/// 자막 파일을 다운로드하여 파싱한다.
 #[tauri::command]
 pub async fn extract_subtitles_cmd(
     video_url: String,
@@ -649,10 +647,10 @@ pub async fn extract_subtitles_cmd(
     Ok(result)
 }
 
-/// Tauri command: select the best subtitle language for a video.
+/// Tauri 커맨드: 영상의 최적 자막 언어를 선택한다.
 ///
-/// Given subtitle check results, returns the language that would be selected
-/// using the Korean > English priority logic.
+/// 자막 확인 결과를 입력받아 한국어 > 영어 우선 로직으로
+/// 선택될 언어를 반환한다.
 #[tauri::command]
 pub async fn select_subtitle_language(
     check_result: SubtitleCheckResult,

@@ -1,14 +1,13 @@
-//! Frame capture module supporting multiple capture modes.
+//! 다중 캡쳐 모드를 지원하는 프레임 캡쳐 모듈.
 //!
-//! Capture modes:
-//! - **scene**: Detect scene changes using ffmpeg's `select` filter with
-//!   a configurable threshold (default 30%).
-//! - **interval**: Capture frames at fixed time intervals.
-//! - **subtitle**: Capture frames at subtitle cue start times (VTT/SRT).
-//!   Falls back to scene-change mode at 30% threshold if no subtitles found.
+//! 캡쳐 모드:
+//! - **scene**: ffmpeg의 `select` 필터로 장면 전환을 감지한다 (기본 임계값 30%).
+//! - **interval**: 고정 시간 간격으로 프레임을 캡쳐한다.
+//! - **subtitle**: 자막 큐 시작 시간에 프레임을 캡쳐한다 (VTT/SRT).
+//!   자막을 찾지 못하면 30% 임계값의 장면 전환 모드로 자동 폴백한다.
 //!
-//! All modes shell out to ffmpeg which must be present next to the executable
-//! (portable distribution) or on the system PATH.
+//! 모든 모드는 ffmpeg에 의존하며, 실행 파일 옆(포터블 배포)이나
+//! 시스템 PATH에 존재해야 한다.
 
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -16,33 +15,32 @@ use std::process::Command;
 
 use crate::cmd_util::HideWindow;
 
-/// Default scene-change detection threshold (0.0–1.0).
-/// A value of 0.30 means a frame is captured when the difference
-/// from the previous frame exceeds 30%.
+/// 장면 전환 감지 기본 임계값 (0.0–1.0).
+/// 0.30은 이전 프레임과의 차이가 30%를 초과하면 캡쳐함을 의미한다.
 pub const DEFAULT_SCENE_THRESHOLD: f64 = 0.30;
 
-/// Result of a single captured frame.
+/// 단일 캡쳐 프레임 결과.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CapturedFrame {
-    /// Zero-based index of this frame in the capture sequence.
+    /// 캡쳐 시퀀스 내 0 기반 인덱스.
     pub index: usize,
-    /// Timestamp in the source video (seconds).
+    /// 원본 영상에서의 타임스탬프(초).
     pub timestamp_secs: f64,
-    /// Human-readable timestamp string, e.g. "00:01:23".
+    /// 사람이 읽기 쉬운 타임스탬프 문자열 (예: "00:01:23").
     pub timestamp: String,
-    /// Output image filename (relative to the output directory).
+    /// 출력 이미지 파일명 (출력 디렉토리 기준 상대 경로).
     pub filename: String,
 }
 
-/// Options for the capture operation.
+/// 캡쳐 작업 옵션.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CaptureOptions {
-    /// Capture mode: "scene", "interval", or "subtitle".
+    /// 캡쳐 모드: "scene", "interval", "subtitle" 중 하나.
     pub mode: String,
-    /// Scene-change threshold (0.0–1.0). Only used when mode == "scene".
+    /// 장면 전환 임계값 (0.0–1.0). mode == "scene"일 때만 사용된다.
     #[serde(default = "default_scene_threshold")]
     pub scene_threshold: f64,
-    /// Interval in seconds. Only used when mode == "interval".
+    /// 간격(초). mode == "interval"일 때만 사용된다.
     #[serde(default = "default_interval")]
     pub interval_seconds: u32,
 }
@@ -65,16 +63,16 @@ impl Default for CaptureOptions {
     }
 }
 
-/// Errors from the capture pipeline.
+/// 캡쳐 파이프라인에서 발생할 수 있는 오류.
 #[derive(Debug)]
 pub enum CaptureError {
-    /// ffmpeg binary not found.
+    /// ffmpeg 바이너리를 찾지 못함.
     FfmpegNotFound(String),
-    /// ffmpeg exited with a non-zero status.
+    /// ffmpeg이 비정상 종료됨.
     FfmpegFailed { exit_code: Option<i32>, stderr: String },
-    /// Failed to parse ffmpeg output.
+    /// ffmpeg 출력 파싱 실패.
     ParseError(String),
-    /// General I/O error.
+    /// 일반 I/O 오류.
     Io(std::io::Error),
 }
 
@@ -99,27 +97,27 @@ impl From<std::io::Error> for CaptureError {
     }
 }
 
-/// Resolve the path to the ffmpeg binary.
+/// ffmpeg 바이너리 경로를 결정한다.
 ///
-/// Search order:
-/// 1. `tools/ffmpeg.exe` next to the executable (managed by tools_manager).
-/// 2. `ffmpeg.exe` directly next to the executable (portable/legacy).
-/// 3. System PATH (fallback).
+/// 탐색 순서:
+/// 1. 실행 파일 옆 `tools/ffmpeg.exe` (tools_manager가 관리).
+/// 2. 실행 파일 바로 옆 `ffmpeg.exe` (포터블/레거시).
+/// 3. 시스템 PATH (폴백).
 pub fn resolve_ffmpeg_path() -> PathBuf {
     crate::tools_manager::resolve_ffmpeg_path()
 }
 
-/// Resolve the path to ffprobe (for duration queries).
+/// ffprobe 경로를 결정한다 (영상 길이 조회에 사용).
 ///
-/// Search order:
-/// 1. `tools/ffprobe.exe` next to the executable (managed by tools_manager).
-/// 2. `ffprobe.exe` directly next to the executable (portable/legacy).
-/// 3. System PATH (fallback).
+/// 탐색 순서:
+/// 1. 실행 파일 옆 `tools/ffprobe.exe` (tools_manager가 관리).
+/// 2. 실행 파일 바로 옆 `ffprobe.exe` (포터블/레거시).
+/// 3. 시스템 PATH (폴백).
 pub fn resolve_ffprobe_path() -> PathBuf {
     crate::tools_manager::resolve_ffprobe_path()
 }
 
-/// Format seconds into "HH:MM:SS" display string.
+/// 초를 "HH:MM:SS" 표시 문자열로 변환한다.
 pub fn format_timestamp(secs: f64) -> String {
     let total = secs.round() as u64;
     let h = total / 3600;
@@ -128,7 +126,7 @@ pub fn format_timestamp(secs: f64) -> String {
     format!("{:02}:{:02}:{:02}", h, m, s)
 }
 
-/// Format seconds into ffmpeg-friendly "HH-MM-SS" for filenames.
+/// 초를 파일명용 "HH-MM-SS" 형식으로 변환한다 (ffmpeg 친화적).
 fn format_timestamp_filename(secs: f64) -> String {
     let total = secs.round() as u64;
     let h = total / 3600;
@@ -139,15 +137,15 @@ fn format_timestamp_filename(secs: f64) -> String {
 
 // ─── Scene-Change Capture ────────────────────────────────────────
 
-/// Capture frames at scene-change boundaries using ffmpeg's `select` filter.
+/// ffmpeg의 `select` 필터로 장면 전환 경계에서 프레임을 캡쳐한다.
 ///
-/// The workflow:
-/// 1. Run ffmpeg with `-vf select='gt(scene,THRESHOLD)',showinfo` to detect
-///    scene changes and log frame timestamps via `showinfo`.
-/// 2. Parse stderr for `pts_time:` values to find timestamps.
-/// 3. Run ffmpeg again to extract a JPEG frame at each detected timestamp.
+/// 동작 순서:
+/// 1. `-vf select='gt(scene,THRESHOLD)',showinfo`로 ffmpeg을 실행해
+///    장면 전환을 감지하고 `showinfo`로 프레임 타임스탬프를 로깅한다.
+/// 2. stderr에서 `pts_time:` 값을 파싱해 타임스탬프를 추출한다.
+/// 3. 각 타임스탬프에서 JPEG 프레임을 추출하기 위해 ffmpeg을 재실행한다.
 ///
-/// Returns an ordered list of `CapturedFrame` entries.
+/// 순서대로 정렬된 `CapturedFrame` 목록을 반환한다.
 pub fn capture_scene_change(
     video_path: &Path,
     output_dir: &Path,
@@ -189,11 +187,11 @@ pub fn capture_scene_change(
     Ok(frames)
 }
 
-/// Use ffmpeg's `select` + `showinfo` filters to detect scene-change timestamps.
+/// ffmpeg의 `select` + `showinfo` 필터로 장면 전환 타임스탬프를 감지한다.
 ///
-/// The `select='gt(scene,T)'` filter passes only frames where the scene-change
-/// score exceeds threshold T (0.0–1.0). The `showinfo` filter logs metadata
-/// including `pts_time` for each passed frame. We parse stderr for these values.
+/// `select='gt(scene,T)'`는 장면 전환 점수가 임계값 T(0.0–1.0)를 초과하는
+/// 프레임만 통과시킨다. `showinfo`는 통과된 각 프레임의 `pts_time`을 포함한
+/// 메타데이터를 로깅하며, 우리는 stderr에서 이 값들을 파싱한다.
 fn detect_scene_changes(
     ffmpeg: &Path,
     video_path: &Path,
@@ -234,7 +232,7 @@ fn detect_scene_changes(
     Ok(timestamps)
 }
 
-/// Parse a `pts_time:` value from a ffmpeg showinfo log line.
+/// ffmpeg showinfo 로그 라인에서 `pts_time:` 값을 파싱한다.
 fn parse_pts_time(line: &str) -> Option<f64> {
     // Look for "pts_time:" followed by a float
     let marker = "pts_time:";
@@ -248,7 +246,7 @@ fn parse_pts_time(line: &str) -> Option<f64> {
     num_str.parse::<f64>().ok()
 }
 
-/// Extract a single JPEG frame from a video at the given timestamp.
+/// 영상의 지정된 타임스탬프에서 JPEG 프레임 한 장을 추출한다.
 fn extract_frame_at(
     ffmpeg: &Path,
     video_path: &Path,
@@ -285,7 +283,7 @@ fn extract_frame_at(
     Ok(())
 }
 
-/// Capture a single frame (fallback when no scene changes detected).
+/// 단일 프레임을 캡쳐한다 (장면 전환이 감지되지 않을 때 폴백).
 fn capture_single_frame(
     ffmpeg: &Path,
     video_path: &Path,
@@ -308,7 +306,7 @@ fn capture_single_frame(
 
 // ─── Interval Capture ────────────────────────────────────────────
 
-/// Capture frames at fixed intervals throughout the video.
+/// 영상 전체에서 고정 간격으로 프레임을 캡쳐한다.
 pub fn capture_interval(
     video_path: &Path,
     output_dir: &Path,
@@ -350,7 +348,7 @@ pub fn capture_interval(
     Ok(frames)
 }
 
-/// Query video duration using ffprobe.
+/// ffprobe로 영상 길이(초)를 조회한다.
 fn probe_duration(video_path: &Path) -> Result<f64, CaptureError> {
     let ffprobe = resolve_ffprobe_path();
 
@@ -385,30 +383,29 @@ fn probe_duration(video_path: &Path) -> Result<f64, CaptureError> {
 
 // ─── Subtitle-Based Capture ──────────────────────────────────────
 
-/// Result of subtitle-based capture attempt, indicating whether fallback occurred.
+/// 자막 기반 캡쳐 시도 결과 — 폴백 발생 여부를 포함한다.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubtitleCaptureResult {
-    /// The captured frames.
+    /// 캡쳐된 프레임 목록.
     pub frames: Vec<CapturedFrame>,
-    /// Whether fallback to scene-change mode was used.
+    /// 장면 전환 모드로 폴백이 발생했는지 여부.
     pub did_fallback: bool,
-    /// Reason for fallback (empty if no fallback).
+    /// 폴백 사유 (폴백 없으면 빈 문자열).
     pub fallback_reason: String,
-    /// Parsed subtitle cues with text (empty if fallback/no subtitles).
-    /// When available, these are used to associate subtitle text with
-    /// captured frames. When empty, frames display timestamp only.
+    /// 텍스트가 포함된 파싱된 자막 큐 (폴백/자막 없으면 빈 벡터).
+    /// 이 값이 있으면 프레임에 자막 텍스트를 연결하는 데 사용되고,
+    /// 없으면 프레임에 타임스탬프만 표시된다.
     #[serde(default)]
     pub cues: Vec<crate::subtitle_extractor::SubtitleCue>,
 }
 
-/// Capture frames at subtitle cue timestamps.
+/// 자막 큐 타임스탬프에서 프레임을 캡쳐한다.
 ///
-/// Looks for subtitle files (`.vtt`, `.srt`) in the same directory as the video.
-/// If subtitle files are found, parses cue start times and captures a frame at
-/// each unique cue time. If no subtitle files are found, automatically falls back
-/// to scene-change detection with the 30% threshold.
+/// 영상과 같은 디렉토리에서 자막 파일(`.vtt`, `.srt`)을 탐색한다.
+/// 자막 파일이 있으면 큐 시작 시간을 파싱해 각 고유 시간에서 프레임을 캡쳐한다.
+/// 자막 파일이 없으면 30% 임계값의 장면 전환 감지로 자동 폴백한다.
 ///
-/// Returns a `SubtitleCaptureResult` that includes the frames and fallback info.
+/// 프레임과 폴백 정보를 포함한 `SubtitleCaptureResult`를 반환한다.
 pub fn capture_subtitle(
     video_path: &Path,
     output_dir: &Path,
@@ -552,15 +549,14 @@ fn find_and_parse_subtitles(video_path: &Path) -> Option<Vec<f64>> {
     Some(Vec::new())
 }
 
-/// Search for subtitle files alongside the video and parse full subtitle cues (with text).
+/// 영상 옆의 자막 파일을 탐색해 텍스트가 포함된 자막 큐로 파싱한다.
 ///
-/// Similar to `find_and_parse_subtitles` but returns `SubtitleCue` objects
-/// that include the subtitle text, not just timestamps. This enables
-/// associating subtitle text with captured frames in the slides viewer.
+/// `find_and_parse_subtitles`와 유사하지만 타임스탬프뿐 아니라
+/// 자막 텍스트도 포함한 `SubtitleCue` 객체를 반환한다.
+/// 슬라이드 뷰어에서 프레임에 자막 텍스트를 연결하는 데 필요하다.
 ///
-/// Returns `None` if no subtitle files found.
-/// Returns `Some(vec![])` if files found but no valid cues.
-/// Returns `Some(cues)` with parsed cues including text.
+/// 자막 파일 없으면 `None`, 파일은 있지만 유효한 큐가 없으면 `Some(vec![])`,
+/// 성공 시 텍스트 포함 큐 `Some(cues)`를 반환한다.
 fn find_and_parse_subtitle_cues(
     video_path: &Path,
 ) -> Option<Vec<crate::subtitle_extractor::SubtitleCue>> {
@@ -643,9 +639,9 @@ fn find_and_parse_subtitle_cues(
     Some(Vec::new())
 }
 
-/// Parse WebVTT (.vtt) subtitle file for cue start timestamps.
+/// WebVTT(.vtt) 자막 파일에서 큐 시작 타임스탬프를 파싱한다.
 ///
-/// VTT format:
+/// VTT 형식:
 /// ```text
 /// WEBVTT
 ///
@@ -656,7 +652,7 @@ fn find_and_parse_subtitle_cues(
 /// Second subtitle text
 /// ```
 ///
-/// Returns deduplicated, sorted timestamps in seconds.
+/// 중복 제거 후 초 단위로 정렬된 타임스탬프를 반환한다.
 pub fn parse_vtt_timestamps(content: &str) -> Vec<f64> {
     let mut timestamps: Vec<f64> = Vec::new();
 
@@ -681,9 +677,9 @@ pub fn parse_vtt_timestamps(content: &str) -> Vec<f64> {
     timestamps
 }
 
-/// Parse SRT (.srt) subtitle file for cue start timestamps.
+/// SRT(.srt) 자막 파일에서 큐 시작 타임스탬프를 파싱한다.
 ///
-/// SRT format:
+/// SRT 형식:
 /// ```text
 /// 1
 /// 00:00:01,000 --> 00:00:04,000
@@ -694,7 +690,7 @@ pub fn parse_vtt_timestamps(content: &str) -> Vec<f64> {
 /// Second subtitle text
 /// ```
 ///
-/// Returns deduplicated, sorted timestamps in seconds.
+/// 중복 제거 후 초 단위로 정렬된 타임스탬프를 반환한다.
 pub fn parse_srt_timestamps(content: &str) -> Vec<f64> {
     let mut timestamps: Vec<f64> = Vec::new();
 
@@ -719,14 +715,14 @@ pub fn parse_srt_timestamps(content: &str) -> Vec<f64> {
     timestamps
 }
 
-/// Parse YouTube json3 subtitle file for cue start timestamps.
+/// YouTube json3 자막 파일에서 큐 시작 타임스탬프를 파싱한다.
 ///
-/// json3 format (as downloaded by yt-dlp):
+/// json3 형식 (yt-dlp로 다운로드된 것):
 /// ```json
 /// {"events":[{"tStartMs":0,"dDurationMs":5000,"segs":[{"utf8":"Hello"}]}, ...]}
 /// ```
 ///
-/// Returns deduplicated, sorted timestamps in seconds.
+/// 중복 제거 후 초 단위로 정렬된 타임스탬프를 반환한다.
 pub fn parse_json3_timestamps(content: &str) -> Vec<f64> {
     let mut timestamps: Vec<f64> = Vec::new();
 
@@ -759,9 +755,9 @@ pub fn parse_json3_timestamps(content: &str) -> Vec<f64> {
     timestamps
 }
 
-/// Parse YouTube json3 subtitle file into full subtitle cues (with text).
+/// YouTube json3 자막 파일을 텍스트가 포함된 자막 큐로 파싱한다.
 ///
-/// json3 format (as downloaded by yt-dlp):
+/// json3 형식 (yt-dlp로 다운로드된 것):
 /// ```json
 /// {"events":[{"tStartMs":0,"dDurationMs":5000,"segs":[{"utf8":"Hello"}]}, ...]}
 /// ```
@@ -812,12 +808,12 @@ fn parse_json3_cues(content: &str) -> Result<Vec<crate::subtitle_extractor::Subt
     Ok(cues)
 }
 
-/// Parse a subtitle timestamp string into seconds.
+/// 자막 타임스탬프 문자열을 초로 변환한다.
 ///
-/// Supports formats:
-/// - `HH:MM:SS.mmm` (e.g., "00:01:23.456")
-/// - `MM:SS.mmm` (e.g., "01:23.456")
-/// - `HH:MM:SS,mmm` (SRT format, caller should replace comma first)
+/// 지원 형식:
+/// - `HH:MM:SS.mmm` (예: "00:01:23.456")
+/// - `MM:SS.mmm` (예: "01:23.456")
+/// - `HH:MM:SS,mmm` (SRT 형식, 쉼표는 호출자가 미리 변환해야 함)
 fn parse_subtitle_timestamp(ts: &str) -> Option<f64> {
     let parts: Vec<&str> = ts.split(':').collect();
     match parts.len() {
@@ -838,9 +834,9 @@ fn parse_subtitle_timestamp(ts: &str) -> Option<f64> {
     }
 }
 
-/// Capture frames at specific timestamps from a video.
+/// 영상의 지정된 타임스탬프 목록에서 프레임을 캡쳐한다.
 ///
-/// Used by subtitle-based capture to extract frames at cue start times.
+/// 자막 기반 캡쳐에서 큐 시작 시간에 프레임을 추출할 때 사용된다.
 fn capture_at_timestamps(
     video_path: &Path,
     output_dir: &Path,
@@ -872,10 +868,10 @@ fn capture_at_timestamps(
 
 // ─── Tauri Commands ──────────────────────────────────────────────
 
-/// Run frame capture on a video file with the given options.
+/// Tauri 커맨드: 주어진 옵션으로 영상 파일에서 프레임을 캡쳐한다.
 ///
-/// Returns a list of captured frames (index, timestamp, filename).
-/// The caller is responsible for generating slides.html from these frames.
+/// 캡쳐된 프레임 목록(인덱스, 타임스탬프, 파일명)을 반환한다.
+/// slides.html 생성은 호출자가 담당한다.
 #[tauri::command]
 pub async fn capture_frames(
     video_path: String,
@@ -919,7 +915,7 @@ pub async fn capture_frames(
     Ok(result)
 }
 
-/// Get the default scene-change threshold value.
+/// Tauri 커맨드: 기본 장면 전환 임계값을 반환한다.
 #[tauri::command]
 pub fn get_scene_threshold() -> f64 {
     DEFAULT_SCENE_THRESHOLD

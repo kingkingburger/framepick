@@ -1,9 +1,14 @@
+//! 앱 설정(config.json) 구조체 및 영속화 로직.
+//!
+//! `AppConfig`는 실행 파일 옆 config.json에 JSON으로 저장된다.
+//! 새 필드를 추가할 때는 `#[serde(default)]`를 붙여 이전 설정과의 하위 호환성을 유지한다.
+
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-/// Supported UI languages.
+/// UI 표시 언어.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Language {
@@ -17,22 +22,22 @@ impl Default for Language {
     }
 }
 
-/// Allowed download quality values.
+/// 허용되는 다운로드 화질 값 목록.
 pub const VALID_QUALITIES: &[&str] = &["360", "480", "720", "1080", "1440", "2160", "best"];
 
-/// Allowed capture mode values.
+/// 허용되는 캡쳐 모드 값 목록.
 pub const VALID_CAPTURE_MODES: &[&str] = &["subtitle", "scene", "interval"];
 
-/// Application settings persisted as config.json next to the executable.
+/// 실행 파일 옆 config.json에 영속화되는 앱 설정.
 ///
-/// Fields:
-/// - `library_path` — root directory for downloads/output (default: `./library/`)
-/// - `download_quality` — YouTube download quality (default: `"720"`)
-/// - `language` — UI language: Korean (`ko`) or English (`en`)
-/// - `mp4_retention` — keep source mp4 after frame extraction (default: `false`)
-/// - `default_capture_mode` — default capture strategy (default: `"subtitle"`)
-/// - `default_interval_seconds` — default interval for fixed-interval mode (default: `30`)
-/// - `scene_change_threshold` — scene-change sensitivity 0.0–1.0 (default: `0.30`)
+/// 필드:
+/// - `library_path` — 다운로드/출력 루트 디렉토리 (기본값: `./library/`)
+/// - `download_quality` — YouTube 다운로드 화질 (기본값: `"720"`)
+/// - `language` — UI 언어: 한국어(`ko`) 또는 영어(`en`)
+/// - `mp4_retention` — 프레임 추출 후 MP4 원본 보존 여부 (기본값: `false`)
+/// - `default_capture_mode` — 기본 캡쳐 전략 (기본값: `"subtitle"`)
+/// - `default_interval_seconds` — 고정 간격 모드의 기본 간격(초) (기본값: `30`)
+/// - `scene_change_threshold` — 장면 전환 감지 민감도 0.0–1.0 (기본값: `0.30`)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
     pub library_path: String,
@@ -61,13 +66,13 @@ fn default_scene_threshold() -> f64 {
 }
 
 impl AppConfig {
-    /// Resolve `library_path` to an absolute path relative to the executable.
+    /// `library_path`를 실행 파일 기준 절대 경로로 변환한다.
     pub fn resolved_library_path(&self) -> std::path::PathBuf {
         ConfigState::resolved_library_path(&self.library_path)
     }
 
-    /// Validate all fields, returning a list of error messages.
-    /// Returns an empty vec if everything is valid.
+    /// 모든 필드의 유효성을 검사하고 오류 메시지 목록을 반환한다.
+    /// 모든 필드가 유효하면 빈 벡터를 반환한다.
     pub fn validate(&self) -> Vec<String> {
         let mut errors = Vec::new();
 
@@ -138,14 +143,14 @@ impl Default for AppConfig {
     }
 }
 
-/// Thread-safe wrapper for Tauri managed state.
+/// Tauri managed state로 사용하기 위한 스레드 안전 래퍼.
 pub struct ConfigState {
     pub config: Mutex<AppConfig>,
     pub config_path: PathBuf,
 }
 
 impl ConfigState {
-    /// Create state by loading from the portable config path (next to exe).
+    /// 실행 파일 옆 config.json을 읽어 상태를 생성한다.
     pub fn new() -> Self {
         let config_path = Self::resolve_config_path();
         let config = Self::load_from_path(&config_path);
@@ -155,8 +160,8 @@ impl ConfigState {
         }
     }
 
-    /// Returns the path to `config.json` beside the running executable.
-    /// Falls back to `./config.json` if the exe path cannot be determined.
+    /// 실행 파일 옆 `config.json` 경로를 반환한다.
+    /// 실행 파일 경로를 알 수 없으면 `./config.json`으로 폴백한다.
     pub fn resolve_config_path() -> PathBuf {
         if let Ok(exe_path) = std::env::current_exe() {
             if let Some(exe_dir) = exe_path.parent() {
@@ -166,7 +171,7 @@ impl ConfigState {
         PathBuf::from("config.json")
     }
 
-    /// Load config from a specific path, returning defaults if missing/invalid.
+    /// 지정된 경로에서 설정을 불러온다. 파일이 없거나 파싱 실패 시 기본값을 반환한다.
     fn load_from_path(path: &PathBuf) -> AppConfig {
         if path.exists() {
             match fs::read_to_string(path) {
@@ -178,7 +183,7 @@ impl ConfigState {
         }
     }
 
-    /// Persist current config to disk.
+    /// 현재 설정을 디스크에 저장한다.
     pub fn save(&self) -> Result<(), String> {
         let config = self.config.lock().map_err(|e| e.to_string())?;
         let json =
@@ -192,8 +197,7 @@ impl ConfigState {
         Ok(())
     }
 
-    /// Resolve `library_path` to an absolute path relative to the executable
-    /// directory when it is relative.
+    /// `library_path`가 상대 경로일 때 실행 파일 디렉토리 기준으로 절대 경로로 변환한다.
     pub fn resolved_library_path(library_path: &str) -> PathBuf {
         let p = PathBuf::from(library_path);
         if p.is_absolute() {

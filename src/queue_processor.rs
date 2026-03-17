@@ -1,11 +1,10 @@
-//! Queue processor — sequential processing of download/capture queue items.
+//! 큐 프로세서 — 다운로드/캡쳐 큐 항목의 순차 처리 모듈.
 //!
-//! Runs in a background async task, processes one item at a time,
-//! and emits Tauri events for each status change so the frontend
-//! can update in real-time.
+//! 백그라운드 비동기 태스크에서 실행되며 한 번에 하나의 항목을 처리하고,
+//! 각 상태 변경 시 Tauri 이벤트를 발행해 프론트엔드가 실시간으로 업데이트할 수 있게 한다.
 //!
-//! Uses `crate::progress::ProgressTracker` for stage-based progress
-//! reporting within each item's pipeline.
+//! 각 항목의 파이프라인 내 단계별 진행 보고는
+//! `crate::progress::ProgressTracker`를 사용한다.
 
 use crate::capture;
 use crate::cleanup;
@@ -20,50 +19,49 @@ use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter, Manager};
 
-/// Global flag indicating whether the processor loop is currently running.
-/// Prevents multiple concurrent processing loops.
+/// 프로세서 루프가 현재 실행 중인지 나타내는 전역 플래그.
+/// 여러 처리 루프가 동시에 실행되는 것을 방지한다.
 static PROCESSING_ACTIVE: AtomicBool = AtomicBool::new(false);
 
-/// Event payload sent to the frontend when a queue item's status changes.
+/// 큐 항목의 상태가 변경될 때 프론트엔드로 전송되는 이벤트 페이로드.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueueStatusEvent {
-    /// Queue item ID
+    /// 큐 항목 ID.
     pub id: u32,
-    /// New status: "pending" | "processing" | "completed" | "failed"
+    /// 새 상태: "pending" | "processing" | "completed" | "failed"
     pub status: String,
-    /// Optional progress percentage (0-100)
+    /// 선택적 진행률 퍼센트 (0-100).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub progress: Option<u32>,
-    /// Video title (populated when available)
+    /// 영상 제목 (가용한 경우 채워짐).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
-    /// Error message (only when status == "failed")
+    /// 오류 메시지 (status == "failed"일 때만).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }
 
-/// Event payload for overall queue state changes.
+/// 전체 큐 상태 변경 이벤트 페이로드.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueueProgressEvent {
-    /// Total items in queue
+    /// 큐의 총 항목 수.
     pub total: usize,
-    /// Number of completed items
+    /// 완료된 항목 수.
     pub completed: usize,
-    /// Number of failed items
+    /// 실패한 항목 수.
     pub failed: usize,
-    /// Whether processing is currently active
+    /// 현재 처리 중인지 여부.
     pub is_processing: bool,
 }
 
-/// Check if the processor is currently running.
+/// 프로세서가 현재 실행 중인지 확인한다.
 pub fn is_processing() -> bool {
     PROCESSING_ACTIVE.load(Ordering::SeqCst)
 }
 
-/// Start processing the queue sequentially in a background task.
+/// 백그라운드 태스크에서 큐를 순차적으로 처리하기 시작한다.
 ///
-/// Returns immediately. If already processing, returns Ok without
-/// starting a duplicate loop.
+/// 즉시 반환한다. 이미 처리 중이면 중복 루프 없이 Ok를 반환한다.
 #[tauri::command]
 pub async fn start_queue_processing(app: AppHandle) -> Result<(), String> {
     // Prevent multiple concurrent processing loops
@@ -87,8 +85,8 @@ pub async fn start_queue_processing(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// Get the pipeline progress for a specific queue item.
-/// Returns the current stage, stage number, total stages, percent, and detail.
+/// 특정 큐 항목의 파이프라인 진행 상황을 반환한다.
+/// 현재 단계, 단계 번호, 총 단계 수, 진행률, 세부 정보를 포함한다.
 #[tauri::command]
 pub fn get_item_progress(
     id: u32,
@@ -110,7 +108,7 @@ pub fn get_item_progress(
     }))
 }
 
-/// Detailed progress information for a specific queue item.
+/// 특정 큐 항목의 상세 진행 정보.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ItemProgressInfo {
     pub queue_id: u32,
@@ -123,7 +121,7 @@ pub struct ItemProgressInfo {
     pub status: String,
 }
 
-/// Get the current processing status.
+/// 현재 처리 상태를 반환한다.
 #[tauri::command]
 pub fn get_processing_status(app: AppHandle) -> Result<QueueProgressEvent, String> {
     let pipeline = app.state::<PipelineState>();
@@ -141,7 +139,7 @@ pub fn get_processing_status(app: AppHandle) -> Result<QueueProgressEvent, Strin
     })
 }
 
-/// Main processing loop — processes items one at a time.
+/// 메인 처리 루프 — 항목을 한 번에 하나씩 처리한다.
 async fn process_queue_loop(app: &AppHandle) {
     loop {
         // Find the next pending item
@@ -220,15 +218,15 @@ async fn process_queue_loop(app: &AppHandle) {
     }
 }
 
-/// Process a single queue item through the download → capture → slides pipeline.
+/// 단일 큐 항목을 다운로드 → 캡쳐 → 슬라이드 파이프라인으로 처리한다.
 ///
-/// **Duplicate detection**: Before processing, checks if the video ID already
-/// exists in the library folder. If so, skips processing and marks as "skipped".
+/// **중복 감지**: 처리 전에 영상 ID가 라이브러리 폴더에 이미 존재하는지 확인한다.
+/// 존재하면 처리를 건너뛰고 "skipped"로 표시한다.
 ///
-/// **Subtitle fallback**: When the capture mode is "subtitle", the pipeline
-/// first checks subtitle availability via `capture_fallback::resolve_capture_mode`.
-/// If no subtitles are found (or the check fails), it automatically falls back
-/// to "scene" mode and emits a `capture:fallback` event to notify the frontend.
+/// **자막 폴백**: 캡쳐 모드가 "subtitle"일 때 파이프라인은 먼저
+/// `capture_fallback::resolve_capture_mode`로 자막 가용 여부를 확인한다.
+/// 자막을 찾지 못하거나 확인에 실패하면 자동으로 "scene" 모드로 폴백하고
+/// `capture:fallback` 이벤트를 발행해 프론트엔드에 알린다.
 async fn process_single_item(
     app: &AppHandle,
     item: &QueueItem,
@@ -467,7 +465,7 @@ async fn process_single_item(
     Ok(Some(title))
 }
 
-/// Update a queue item's status in the shared state.
+/// 공유 상태에서 큐 항목의 상태를 업데이트한다.
 fn update_item_status(
     app: &AppHandle,
     id: u32,
@@ -501,12 +499,12 @@ fn update_item_status(
     }
 }
 
-/// Emit a queue item status change event to the frontend.
+/// 큐 항목 상태 변경 이벤트를 프론트엔드로 발행한다.
 fn emit_status_event(app: &AppHandle, event: &QueueStatusEvent) {
     let _ = app.emit("queue-item-status", event);
 }
 
-/// Update a queue item's capture mode in the shared state (used after fallback).
+/// 공유 상태에서 큐 항목의 캡쳐 모드를 업데이트한다 (폴백 후 사용).
 fn update_item_capture_mode(app: &AppHandle, id: u32, mode: &str) {
     let pipeline = app.state::<PipelineState>();
     let queue_result = pipeline.queue.lock();
@@ -517,7 +515,7 @@ fn update_item_capture_mode(app: &AppHandle, id: u32, mode: &str) {
     }
 }
 
-/// Emit overall queue progress event to the frontend.
+/// 전체 큐 진행 이벤트를 프론트엔드로 발행한다.
 fn emit_queue_progress(app: &AppHandle) -> Result<(), String> {
     let pipeline = app.state::<PipelineState>();
     let queue = pipeline.queue.lock().map_err(|e| e.to_string())?;

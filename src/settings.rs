@@ -1,8 +1,8 @@
-//! Settings module — wraps config types and provides Tauri commands.
+//! 설정 모듈 — config 타입을 래핑하고 Tauri 커맨드를 제공한다.
 //!
-//! The canonical data model lives in `crate::config`. This module provides
-//! the Tauri-facing API (`SettingsState`, `get_settings`, `update_settings`,
-//! `validate_settings`, `reset_settings`, `get_config_path`).
+//! 실제 데이터 모델은 `crate::config`에 있다. 이 모듈은
+//! 프론트엔드와 통신하는 Tauri API(`SettingsState`, `get_settings`,
+//! `update_settings`, `validate_settings`, `reset_settings`, `get_config_path`)를 담당한다.
 
 pub use crate::config::{AppConfig, Language, VALID_CAPTURE_MODES, VALID_QUALITIES};
 
@@ -10,13 +10,14 @@ use crate::config::ConfigState;
 use serde::Serialize;
 use std::sync::Mutex;
 
-/// Alias used throughout the Tauri integration layer.
+/// Tauri 통합 레이어 전체에서 사용하는 타입 별칭.
 pub type Settings = AppConfig;
 
-/// Thread-safe state wrapper for Tauri managed state.
+/// Tauri managed state용 스레드 안전 래퍼.
 pub struct SettingsState(pub Mutex<Settings>);
 
-/// Load settings from the portable config path (beside executable).
+/// 실행 파일 옆 config.json에서 설정을 불러온다.
+/// 파일이 없으면 기본값을 반환한다.
 pub fn load_settings() -> Result<Settings, String> {
     let path = ConfigState::resolve_config_path();
     if path.exists() {
@@ -37,7 +38,7 @@ pub fn load_settings() -> Result<Settings, String> {
     }
 }
 
-/// Persist settings to the portable config path.
+/// 실행 파일 옆 config.json에 설정을 저장한다.
 pub fn save_settings(settings: &Settings) -> Result<(), String> {
     let path = ConfigState::resolve_config_path();
     if let Some(parent) = path.parent() {
@@ -49,18 +50,18 @@ pub fn save_settings(settings: &Settings) -> Result<(), String> {
     Ok(())
 }
 
-/// Tauri command: return current settings to the frontend.
+/// Tauri 커맨드: 현재 설정을 프론트엔드에 반환한다.
 #[tauri::command]
 pub fn get_settings(state: tauri::State<'_, SettingsState>) -> Result<Settings, String> {
     let settings = state.0.lock().map_err(|e| format!("Lock error: {e}"))?;
     Ok(settings.clone())
 }
 
-/// Tauri command: partially update settings and persist to disk.
+/// Tauri 커맨드: 설정을 부분 업데이트하고 디스크에 저장한다.
 ///
-/// Accepts a JSON object with any subset of `Settings` fields.
-/// Only provided fields are overwritten; others keep their current values.
-/// Validates all fields before persisting.
+/// `Settings` 필드의 임의 부분 집합을 담은 JSON 객체를 받는다.
+/// 제공된 필드만 덮어쓰고 나머지는 기존 값을 유지한다.
+/// 저장 전에 모든 필드의 유효성을 검사한다.
 #[tauri::command]
 pub fn update_settings(
     state: tauri::State<'_, SettingsState>,
@@ -132,28 +133,28 @@ pub fn update_settings(
     Ok(settings.clone())
 }
 
-/// Result of settings validation — includes field-level details.
+/// 설정 유효성 검사 결과 — 필드 수준의 세부 정보를 포함한다.
 #[derive(Debug, Clone, Serialize)]
 pub struct ValidationResult {
-    /// Overall validity
+    /// 전체 유효성 여부
     pub valid: bool,
-    /// List of error messages (empty if valid)
+    /// 오류 메시지 목록 (유효하면 비어 있음)
     pub errors: Vec<String>,
-    /// Whether ffmpeg.exe is found next to the executable
+    /// 실행 파일 옆에 ffmpeg.exe가 존재하는지 여부
     pub ffmpeg_found: bool,
-    /// Whether yt-dlp.exe is found next to the executable
+    /// 실행 파일 옆에 yt-dlp.exe가 존재하는지 여부
     pub ytdlp_found: bool,
-    /// Resolved absolute path of the library directory
+    /// 라이브러리 디렉토리의 절대 경로
     pub resolved_library_path: String,
-    /// Whether the library directory exists
+    /// 라이브러리 디렉토리의 실제 존재 여부
     pub library_exists: bool,
-    /// Path where config.json is stored
+    /// config.json이 저장된 경로
     pub config_path: String,
 }
 
-/// Tauri command: validate current settings and check external tool availability.
+/// Tauri 커맨드: 현재 설정의 유효성을 검사하고 외부 도구 존재 여부를 확인한다.
 ///
-/// Returns a `ValidationResult` with field errors, tool presence, and path info.
+/// 필드 오류, 도구 존재 여부, 경로 정보가 담긴 `ValidationResult`를 반환한다.
 #[tauri::command]
 pub fn validate_settings(
     state: tauri::State<'_, SettingsState>,
@@ -189,7 +190,7 @@ pub fn validate_settings(
     })
 }
 
-/// Tauri command: reset all settings to defaults and persist.
+/// Tauri 커맨드: 모든 설정을 기본값으로 초기화하고 저장한다.
 #[tauri::command]
 pub fn reset_settings(
     state: tauri::State<'_, SettingsState>,
@@ -200,9 +201,9 @@ pub fn reset_settings(
     Ok(settings.clone())
 }
 
-/// Tauri command: return the filesystem path to config.json.
+/// Tauri 커맨드: config.json의 파일 시스템 경로를 반환한다.
 ///
-/// Useful for the frontend to display where settings are stored.
+/// 프론트엔드에서 설정 파일 위치를 표시할 때 사용한다.
 #[tauri::command]
 pub fn get_config_path() -> String {
     ConfigState::resolve_config_path()

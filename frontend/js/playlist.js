@@ -1,28 +1,29 @@
 /**
- * playlist.js - Playlist video selection modal for framepick
+ * @file playlist.js
+ * @description framepick 재생목록 영상 선택 모달 컴포넌트
  *
- * When a YouTube playlist URL is detected, this module shows a modal
- * allowing users to select which videos to add to the processing queue.
+ * YouTube 재생목록 URL이 감지되면 처리 큐에 추가할
+ * 영상을 선택할 수 있는 모달을 표시한다.
  *
- * Features:
- *   - Checkbox per video with title and duration
- *   - Select All / Select None controls
- *   - Video count summary
- *   - Loading state while fetching playlist info
- *   - Error handling for failed playlist fetches
+ * 주요 기능:
+ *   - 영상별 체크박스 (제목 및 재생시간 표시)
+ *   - 전체 선택 / 전체 해제 컨트롤
+ *   - 영상 수 요약 표시
+ *   - 재생목록 정보 가져오는 동안 로딩 상태 표시
+ *   - 재생목록 가져오기 실패 시 오류 처리
  *
- * Emits DOM events:
+ * 발행하는 DOM 이벤트:
  *   - playlistVideosSelected: { videos: Array<{ url, videoId, title, duration }> }
  */
 
 const PlaylistUI = (() => {
-  // YouTube playlist URL patterns
+  // YouTube 재생목록 URL 패턴
   const PLAYLIST_PATTERNS = [
     // youtube.com/playlist?list=PLxxxxxx
     /^https?:\/\/(?:www\.)?youtube\.com\/playlist\?(?:.*&)?list=([A-Za-z0-9_-]+)/,
     // youtube.com/watch?v=xxx&list=PLxxxxxx
     /^https?:\/\/(?:www\.)?youtube\.com\/watch\?(?:.*&)?list=([A-Za-z0-9_-]+)/,
-    // m.youtube.com variants
+    // m.youtube.com 변형
     /^https?:\/\/m\.youtube\.com\/playlist\?(?:.*&)?list=([A-Za-z0-9_-]+)/,
     /^https?:\/\/m\.youtube\.com\/watch\?(?:.*&)?list=([A-Za-z0-9_-]+)/,
   ];
@@ -43,8 +44,8 @@ const PlaylistUI = (() => {
   let isOpen = false;
 
   /**
-   * Initialize the playlist modal component.
-   * Should be called after DOM is ready.
+   * 재생목록 모달 컴포넌트를 초기화한다.
+   * DOM이 준비된 후 호출해야 한다.
    */
   function init() {
     modalEl = document.getElementById('playlist-modal');
@@ -63,7 +64,7 @@ const PlaylistUI = (() => {
     errorEl = document.getElementById('playlist-error');
     bodyEl = document.getElementById('playlist-body');
 
-    // Bind events
+    // 이벤트 바인딩
     if (selectAllCheckbox) {
       selectAllCheckbox.addEventListener('change', _onSelectAllChange);
     }
@@ -77,24 +78,24 @@ const PlaylistUI = (() => {
       closeBtn.addEventListener('click', close);
     }
 
-    // Close on overlay click
+    // 오버레이 클릭 시 닫기
     modalEl.addEventListener('click', (e) => {
       if (e.target === modalEl) close();
     });
 
-    // Close on Escape key
+    // Escape 키로 닫기
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && isOpen) close();
     });
 
-    // Listen for language changes to re-render
+    // 언어 변경 시 재렌더링
     document.addEventListener('languageChanged', () => {
       if (isOpen) _renderList();
     });
   }
 
   /**
-   * Check if a URL is a YouTube playlist URL.
+   * URL이 YouTube 재생목록 URL인지 확인한다.
    * @param {string} url
    * @returns {{ isPlaylist: boolean, listId: string|null }}
    */
@@ -110,10 +111,10 @@ const PlaylistUI = (() => {
   }
 
   /**
-   * Open the playlist selection modal.
-   * Fetches playlist info from the backend and displays video list.
-   * @param {string} url - The playlist URL
-   * @param {string} listId - The playlist ID
+   * 재생목록 선택 모달을 연다.
+   * 백엔드에서 재생목록 정보를 가져와 영상 목록을 표시한다.
+   * @param {string} url - 재생목록 URL
+   * @param {string} listId - 재생목록 ID
    */
   async function open(url, listId) {
     if (!modalEl) return;
@@ -122,13 +123,13 @@ const PlaylistUI = (() => {
     videos = [];
     modalEl.hidden = false;
 
-    // Show loading state
+    // 로딩 상태 표시
     _showLoading(true);
     _showError(null);
     _updateCount();
 
     try {
-      // Fetch playlist entries from backend using yt-dlp --flat-playlist
+      // yt-dlp --flat-playlist를 사용하여 백엔드에서 재생목록 항목 가져오기
       let playlistData = null;
       if (window.__TAURI__ && window.__TAURI__.core) {
         playlistData = await window.__TAURI__.core.invoke('fetch_playlist', {
@@ -146,7 +147,7 @@ const PlaylistUI = (() => {
           selected: true,
         }));
       } else {
-        // No videos or backend unavailable — show error
+        // 영상 없음 또는 백엔드 미사용 — 오류 표시
         _showError(t('playlist_fetch_error'));
         _showLoading(false);
         return;
@@ -165,8 +166,8 @@ const PlaylistUI = (() => {
   }
 
   /**
-   * Open the modal with pre-loaded video data (no backend fetch needed).
-   * Useful for testing or when playlist data is already available.
+   * 미리 로드된 영상 데이터로 모달을 연다 (백엔드 가져오기 불필요).
+   * 테스트 또는 재생목록 데이터가 이미 있는 경우 유용하다.
    * @param {Array<{ videoId: string, title: string, duration: string, url: string }>} videoData
    */
   function openWithData(videoData) {
@@ -187,7 +188,7 @@ const PlaylistUI = (() => {
   }
 
   /**
-   * Close the playlist modal.
+   * 재생목록 모달을 닫는다.
    */
   function close() {
     if (!modalEl) return;
@@ -198,7 +199,7 @@ const PlaylistUI = (() => {
   }
 
   /**
-   * Get currently selected videos.
+   * 현재 선택된 영상 목록을 반환한다.
    * @returns {Array<{ videoId: string, title: string, duration: string, url: string }>}
    */
   function getSelectedVideos() {
@@ -208,14 +209,14 @@ const PlaylistUI = (() => {
   }
 
   /**
-   * Check if the modal is currently open.
+   * 모달이 현재 열려있는지 확인한다.
    * @returns {boolean}
    */
   function isModalOpen() {
     return isOpen;
   }
 
-  // ---- Internal ----
+  // ---- 내부 함수 ----
 
   function _showLoading(show) {
     if (loadingEl) loadingEl.hidden = !show;
@@ -235,9 +236,9 @@ const PlaylistUI = (() => {
   }
 
   function _formatDuration(durationStr, durationSeconds) {
-    // If a formatted string is provided, use it
+    // 형식화된 문자열이 있으면 그대로 사용
     if (durationStr) return durationStr;
-    // Otherwise format from seconds
+    // 없으면 초에서 변환
     if (!durationSeconds || durationSeconds <= 0) return '';
     const h = Math.floor(durationSeconds / 3600);
     const m = Math.floor((durationSeconds % 3600) / 60);
@@ -275,7 +276,7 @@ const PlaylistUI = (() => {
       `;
     }).join('');
 
-    // Bind checkbox change events
+    // 체크박스 변경 이벤트 바인딩
     videoListEl.querySelectorAll('.playlist-video-checkbox').forEach(cb => {
       cb.addEventListener('change', (e) => {
         const idx = parseInt(cb.getAttribute('data-index'), 10);
@@ -328,7 +329,7 @@ const PlaylistUI = (() => {
     const checked = selectAllCheckbox.checked;
     videos.forEach(v => { v.selected = checked; });
 
-    // Update all checkboxes in the DOM
+    // DOM의 모든 체크박스 업데이트
     if (videoListEl) {
       videoListEl.querySelectorAll('.playlist-video-checkbox').forEach(cb => {
         cb.checked = checked;
@@ -343,7 +344,7 @@ const PlaylistUI = (() => {
     const selected = getSelectedVideos();
     if (selected.length === 0) return;
 
-    // Dispatch event for app.js to handle
+    // app.js가 처리할 이벤트 발행
     document.dispatchEvent(new CustomEvent('playlistVideosSelected', {
       detail: { videos: selected }
     }));
@@ -352,7 +353,7 @@ const PlaylistUI = (() => {
   }
 
   /**
-   * Select all videos.
+   * 모든 영상을 선택한다.
    */
   function selectAll() {
     videos.forEach(v => { v.selected = true; });
@@ -362,7 +363,7 @@ const PlaylistUI = (() => {
   }
 
   /**
-   * Deselect all videos.
+   * 모든 영상 선택을 해제한다.
    */
   function selectNone() {
     videos.forEach(v => { v.selected = false; });

@@ -1,21 +1,21 @@
-//! Input state management for the download/capture pipeline.
+//! 다운로드/캡쳐 파이프라인의 입력 상태 관리 모듈.
 //!
-//! Stores the current URL, capture mode, and interval settings from the
-//! frontend, plus a queue of items submitted for processing.
+//! 프론트엔드에서 받은 현재 URL, 캡쳐 모드, 간격 설정과
+//! 처리 제출된 항목의 큐를 저장한다.
 
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::State;
 
-/// Current input state from the frontend (URL + capture options).
-/// Synced on every change from the UI so the backend always has the latest values.
+/// 프론트엔드의 현재 입력 상태 (URL + 캡쳐 옵션).
+/// UI 변경 시마다 동기화되어 백엔드가 항상 최신 값을 가진다.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InputState {
-    /// YouTube URL entered by the user
+    /// 사용자가 입력한 YouTube URL.
     pub url: String,
-    /// Capture mode: "subtitle" | "scene" | "interval"
+    /// 캡쳐 모드: "subtitle" | "scene" | "interval"
     pub capture_mode: String,
-    /// Interval in seconds (only relevant when capture_mode == "interval")
+    /// 간격(초), capture_mode == "interval"일 때만 관련.
     pub interval_seconds: u32,
 }
 
@@ -29,39 +29,39 @@ impl Default for InputState {
     }
 }
 
-/// A queue item submitted for download and frame capture.
+/// 다운로드 및 프레임 캡쳐를 위해 제출된 큐 항목.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueueItem {
-    /// Unique ID (assigned by the frontend)
+    /// 고유 ID (프론트엔드에서 할당).
     pub id: u32,
-    /// YouTube URL
+    /// YouTube URL.
     pub url: String,
-    /// Capture mode snapshot at time of submission
+    /// 제출 시점의 캡쳐 모드 스냅샷.
     pub capture_mode: String,
-    /// Interval seconds snapshot at time of submission
+    /// 제출 시점의 간격(초) 스냅샷.
     pub interval_seconds: u32,
-    /// Processing status: "pending" | "processing" | "completed" | "failed" | "skipped"
+    /// 처리 상태: "pending" | "processing" | "completed" | "failed" | "skipped"
     #[serde(default = "default_status")]
     pub status: String,
-    /// Video title (populated after metadata fetch)
+    /// 영상 제목 (메타데이터 조회 후 채워짐).
     #[serde(default)]
     pub title: Option<String>,
-    /// Error message if status == "failed"
+    /// status == "failed"일 때의 오류 메시지.
     #[serde(default)]
     pub error: Option<String>,
-    /// Progress percentage (0-100) during processing
+    /// 처리 중 진행률 (0-100).
     #[serde(default)]
     pub progress: Option<u32>,
-    /// Current pipeline stage identifier (e.g. "downloading", "extracting_frames")
+    /// 현재 파이프라인 단계 식별자 (예: "downloading", "extracting_frames").
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pipeline_stage: Option<String>,
-    /// 1-based index of the current pipeline stage
+    /// 현재 파이프라인 단계의 1-기반 인덱스.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pipeline_stage_number: Option<u32>,
-    /// Total number of pipeline stages for this item
+    /// 이 항목의 총 파이프라인 단계 수.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pipeline_total_stages: Option<u32>,
-    /// Optional detail message for the current stage (e.g. "frame 12/48")
+    /// 현재 단계의 선택적 세부 메시지 (예: "frame 12/48").
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pipeline_detail: Option<String>,
 }
@@ -70,7 +70,7 @@ fn default_status() -> String {
     "pending".to_string()
 }
 
-/// Thread-safe Tauri state for the input and queue.
+/// 입력과 큐를 위한 스레드 안전 Tauri 상태.
 pub struct PipelineState {
     pub input: Mutex<InputState>,
     pub queue: Mutex<Vec<QueueItem>>,
@@ -87,8 +87,8 @@ impl PipelineState {
 
 // ─── Tauri Commands ──────────────────────────────────────────────
 
-/// Store the latest input field values from the frontend.
-/// Called on every keystroke / mode change to keep backend in sync.
+/// 프론트엔드의 최신 입력 필드 값을 저장한다.
+/// 백엔드 동기화를 위해 키 입력 / 모드 변경마다 호출된다.
 #[tauri::command]
 pub fn set_input_state(
     state: InputState,
@@ -99,7 +99,7 @@ pub fn set_input_state(
     Ok(())
 }
 
-/// Get the current input state (for restoring UI after navigation).
+/// 현재 입력 상태를 반환한다 (내비게이션 후 UI 복원에 사용).
 #[tauri::command]
 pub fn get_input_state(
     pipeline: State<'_, PipelineState>,
@@ -108,12 +108,12 @@ pub fn get_input_state(
     Ok(current.clone())
 }
 
-/// Add an item to the processing queue.
+/// 처리 큐에 항목을 추가한다.
 ///
-/// Duplicate detection checks both URL string equality and video ID
-/// extraction. Two different URL formats pointing to the same video
-/// (e.g. `youtube.com/watch?v=X` and `youtu.be/X`) are treated as
-/// duplicates if their extracted video IDs match.
+/// 중복 감지는 URL 문자열 동등성과 영상 ID 추출 모두를 확인한다.
+/// 같은 영상을 가리키는 두 다른 URL 형식
+/// (예: `youtube.com/watch?v=X`와 `youtu.be/X`)은
+/// 추출된 영상 ID가 일치하면 중복으로 처리한다.
 #[tauri::command]
 pub fn add_queue_item(
     item: QueueItem,
@@ -150,7 +150,7 @@ pub fn add_queue_item(
     Ok(stored)
 }
 
-/// Get all queue items.
+/// 모든 큐 항목을 반환한다.
 #[tauri::command]
 pub fn get_queue(
     pipeline: State<'_, PipelineState>,
@@ -159,7 +159,7 @@ pub fn get_queue(
     Ok(queue.clone())
 }
 
-/// Update a queue item by ID (partial merge for status, title, error, progress).
+/// ID로 큐 항목을 업데이트한다 (status, title, error, progress 부분 병합).
 #[tauri::command]
 pub fn update_queue_item(
     id: u32,
@@ -191,7 +191,7 @@ pub fn update_queue_item(
     Ok(())
 }
 
-/// Remove a queue item by ID.
+/// ID로 큐 항목을 제거한다.
 #[tauri::command]
 pub fn remove_queue_item(
     id: u32,
@@ -206,7 +206,7 @@ pub fn remove_queue_item(
     Ok(())
 }
 
-/// Retry a failed queue item by resetting its status to "pending".
+/// 실패한 큐 항목을 상태를 "pending"으로 초기화하여 재시도한다.
 #[tauri::command]
 pub fn retry_queue_item(
     id: u32,
@@ -231,9 +231,8 @@ pub fn retry_queue_item(
     Ok(())
 }
 
-/// Set the language in settings and persist.
-/// Convenience command so the frontend can update language without
-/// sending the full settings object.
+/// 설정에서 언어를 설정하고 저장한다.
+/// 프론트엔드가 전체 설정 객체 없이 언어만 업데이트할 수 있는 편의 커맨드.
 #[tauri::command]
 pub fn set_language(
     language: String,
