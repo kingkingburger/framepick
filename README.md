@@ -52,6 +52,25 @@ cargo tauri build
 
 생성된 실행 파일은 `src-tauri/target/release/` 디렉토리에 위치합니다.
 
+### 트러블슈팅
+
+**`cargo tauri build` 실행 시 "no such command: tauri" 오류**
+
+Tauri CLI가 설치되지 않은 경우 발생합니다:
+```bash
+cargo install tauri-cli
+```
+
+**ffmpeg/yt-dlp 관련 오류**
+
+앱 첫 실행 시 자동 다운로드됩니다. 수동 설치가 필요한 경우:
+- [ffmpeg](https://ffmpeg.org/download.html) — 실행 파일과 같은 폴더에 `ffmpeg.exe` 배치
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp/releases) — 실행 파일과 같은 폴더에 `yt-dlp.exe` 배치
+
+**Windows에서 빌드 실패 시**
+
+Visual Studio Build Tools가 필요합니다. [Visual Studio Installer](https://visualstudio.microsoft.com/ko/visual-cpp-build-tools/)에서 "C++ 데스크톱 개발" 워크로드를 설치하세요.
+
 ## 프로젝트 구조
 
 ### 백엔드 (Rust - `src/`)
