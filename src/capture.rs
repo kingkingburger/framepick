@@ -97,26 +97,6 @@ impl From<std::io::Error> for CaptureError {
     }
 }
 
-/// ffmpeg 바이너리 경로를 결정한다.
-///
-/// 탐색 순서:
-/// 1. 실행 파일 옆 `tools/ffmpeg.exe` (tools_manager가 관리).
-/// 2. 실행 파일 바로 옆 `ffmpeg.exe` (포터블/레거시).
-/// 3. 시스템 PATH (폴백).
-pub fn resolve_ffmpeg_path() -> PathBuf {
-    crate::tools_manager::resolve_ffmpeg_path()
-}
-
-/// ffprobe 경로를 결정한다 (영상 길이 조회에 사용).
-///
-/// 탐색 순서:
-/// 1. 실행 파일 옆 `tools/ffprobe.exe` (tools_manager가 관리).
-/// 2. 실행 파일 바로 옆 `ffprobe.exe` (포터블/레거시).
-/// 3. 시스템 PATH (폴백).
-pub fn resolve_ffprobe_path() -> PathBuf {
-    crate::tools_manager::resolve_ffprobe_path()
-}
-
 /// 초를 "HH:MM:SS" 표시 문자열로 변환한다.
 pub fn format_timestamp(secs: f64) -> String {
     let total = secs.round() as u64;
@@ -151,7 +131,7 @@ pub fn capture_scene_change(
     output_dir: &Path,
     threshold: f64,
 ) -> Result<Vec<CapturedFrame>, CaptureError> {
-    let ffmpeg = resolve_ffmpeg_path();
+    let ffmpeg = crate::tools_manager::resolve_ffmpeg_path();
     let images_dir = output_dir.join("images");
     std::fs::create_dir_all(&images_dir)?;
 
@@ -313,7 +293,7 @@ pub fn capture_interval(
     interval_secs: u32,
     duration_secs: Option<f64>,
 ) -> Result<Vec<CapturedFrame>, CaptureError> {
-    let ffmpeg = resolve_ffmpeg_path();
+    let ffmpeg = crate::tools_manager::resolve_ffmpeg_path();
     let images_dir = output_dir.join("images");
     std::fs::create_dir_all(&images_dir)?;
 
@@ -350,7 +330,7 @@ pub fn capture_interval(
 
 /// ffprobe로 영상 길이(초)를 조회한다.
 fn probe_duration(video_path: &Path) -> Result<f64, CaptureError> {
-    let ffprobe = resolve_ffprobe_path();
+    let ffprobe = crate::tools_manager::resolve_ffprobe_path();
 
     let output = Command::new(&ffprobe)
         .args([
@@ -842,7 +822,7 @@ fn capture_at_timestamps(
     output_dir: &Path,
     timestamps: &[f64],
 ) -> Result<Vec<CapturedFrame>, CaptureError> {
-    let ffmpeg = resolve_ffmpeg_path();
+    let ffmpeg = crate::tools_manager::resolve_ffmpeg_path();
     let images_dir = output_dir.join("images");
     std::fs::create_dir_all(&images_dir)?;
 
@@ -1038,7 +1018,7 @@ mod tests {
     #[test]
     fn test_resolve_ffmpeg_path_fallback() {
         // Should at least return "ffmpeg" as fallback
-        let path = resolve_ffmpeg_path();
+        let path = crate::tools_manager::resolve_ffmpeg_path();
         let name = path.file_name().unwrap().to_str().unwrap();
         assert!(
             name == "ffmpeg" || name == "ffmpeg.exe",
@@ -1049,7 +1029,7 @@ mod tests {
 
     #[test]
     fn test_resolve_ffprobe_path_fallback() {
-        let path = resolve_ffprobe_path();
+        let path = crate::tools_manager::resolve_ffprobe_path();
         let name = path.file_name().unwrap().to_str().unwrap();
         assert!(
             name == "ffprobe" || name == "ffprobe.exe",

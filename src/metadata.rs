@@ -4,7 +4,6 @@
 //! `fetch_metadata()` 함수를 제공한다.
 
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 use std::process::Command;
 
 use crate::cmd_util::HideWindow;
@@ -41,22 +40,12 @@ struct YtDlpJson {
     upload_date: Option<String>,
 }
 
-/// yt-dlp 실행 파일 경로를 반환한다.
-///
-/// 탐색 순서:
-/// 1. 실행 파일 옆의 `tools/yt-dlp.exe` (tools_manager가 관리).
-/// 2. 실행 파일 바로 옆의 `yt-dlp.exe` (포터블/레거시).
-/// 3. 시스템 PATH 폴백.
-pub fn resolve_ytdlp_path() -> PathBuf {
-    crate::tools_manager::resolve_ytdlp_path()
-}
-
 /// yt-dlp로 YouTube 영상 URL의 메타데이터를 가져온다.
 ///
 /// `yt-dlp --dump-json --no-playlist <url>`을 실행하고 JSON 출력을
 /// [`VideoMetadata`] 구조체로 파싱한다. 실패 시 오류 문자열을 반환한다.
 pub fn fetch_metadata(url: &str) -> Result<VideoMetadata, String> {
-    let ytdlp_path = resolve_ytdlp_path();
+    let ytdlp_path = crate::tools_manager::resolve_ytdlp_path();
 
     let output = Command::new(&ytdlp_path)
         .args(["--dump-json", "--no-playlist", url])
@@ -173,13 +162,13 @@ mod tests {
 
     #[test]
     fn test_resolve_ytdlp_path_returns_nonempty() {
-        let path = resolve_ytdlp_path();
+        let path = crate::tools_manager::resolve_ytdlp_path();
         assert!(!path.to_string_lossy().is_empty());
     }
 
     #[test]
     fn test_resolve_ytdlp_path_correct_extension() {
-        let path = resolve_ytdlp_path();
+        let path = crate::tools_manager::resolve_ytdlp_path();
         let name = path.file_name().unwrap().to_string_lossy();
         if cfg!(windows) {
             assert!(name.ends_with(".exe"), "expected .exe on Windows, got {name}");

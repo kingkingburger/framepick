@@ -6,7 +6,7 @@
 //! - 라이브러리 항목(이전에 생성된 슬라이드 세트) 목록 조회
 //! - segments.json에서 메타데이터 추출
 
-use crate::config::ConfigState;
+use crate::config;
 use crate::settings::SettingsState;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -74,10 +74,18 @@ pub struct CaptureFramesResult {
     pub frames: Vec<CaptureFrame>,
 }
 
+/// HTML `<title>` 태그에서 제목 텍스트를 추출한다.
+fn extract_title_from_html(html: &str) -> Option<String> {
+    let start = html.find("<title>")?;
+    let end = html[start..].find("</title>")?;
+    let t = &html[start + 7..start + end];
+    if t.is_empty() { None } else { Some(t.to_string()) }
+}
+
 /// 설정에서 라이브러리 경로를 가져오고, 상대 경로인 경우 실행 파일 디렉토리 기준 절대 경로로 변환한다.
 fn resolve_library_path(state: &SettingsState) -> Result<PathBuf, String> {
     let settings = state.0.lock().map_err(|e| e.to_string())?;
-    Ok(ConfigState::resolved_library_path(&settings.library_path))
+    Ok(config::resolved_library_path(&settings.library_path))
 }
 
 /// URL에 사용하기 위해 경로 구성 요소를 퍼센트 인코딩한다.
@@ -346,14 +354,7 @@ pub fn list_library_entries(
         // Try to extract title from slides.html <title> tag
         if has_slides {
             if let Ok(html) = fs::read_to_string(&slides_path) {
-                if let Some(start) = html.find("<title>") {
-                    if let Some(end) = html[start..].find("</title>") {
-                        let t = &html[start + 7..start + end];
-                        if !t.is_empty() {
-                            title = Some(t.to_string());
-                        }
-                    }
-                }
+                title = extract_title_from_html(&html);
             }
         }
 
@@ -489,13 +490,8 @@ pub fn get_slides_metadata(
     // Extract title from HTML
     if has_slides_html {
         if let Ok(html) = fs::read_to_string(&slides_path) {
-            if let Some(start) = html.find("<title>") {
-                if let Some(end) = html[start..].find("</title>") {
-                    let t = &html[start + 7..start + end];
-                    if !t.is_empty() {
-                        title = t.to_string();
-                    }
-                }
+            if let Some(t) = extract_title_from_html(&html) {
+                title = t;
             }
         }
     }
@@ -544,13 +540,8 @@ pub fn get_capture_frames(
     // Try to extract title from slides.html <title> tag
     if slides_path.exists() {
         if let Ok(html) = fs::read_to_string(&slides_path) {
-            if let Some(start) = html.find("<title>") {
-                if let Some(end) = html[start..].find("</title>") {
-                    let t = &html[start + 7..start + end];
-                    if !t.is_empty() {
-                        title = t.to_string();
-                    }
-                }
+            if let Some(t) = extract_title_from_html(&html) {
+                title = t;
             }
         }
     }
@@ -794,12 +785,7 @@ pub async fn recapture_library_item(
             if slides_path.exists() {
                 fs::read_to_string(&slides_path)
                     .ok()
-                    .and_then(|html| {
-                        let start = html.find("<title>")?;
-                        let end = html[start..].find("</title>")?;
-                        let t = &html[start + 7..start + end];
-                        if t.is_empty() { None } else { Some(t.to_string()) }
-                    })
+                    .and_then(|html| extract_title_from_html(&html))
             } else {
                 None
             }

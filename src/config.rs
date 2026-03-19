@@ -6,7 +6,6 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use std::sync::Mutex;
 
 /// UI 표시 언어.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -68,7 +67,7 @@ fn default_scene_threshold() -> f64 {
 impl AppConfig {
     /// `library_path`를 실행 파일 기준 절대 경로로 변환한다.
     pub fn resolved_library_path(&self) -> std::path::PathBuf {
-        ConfigState::resolved_library_path(&self.library_path)
+        resolved_library_path(&self.library_path)
     }
 
     /// 모든 필드의 유효성을 검사하고 오류 메시지 목록을 반환한다.
@@ -143,72 +142,28 @@ impl Default for AppConfig {
     }
 }
 
-/// Tauri managed state로 사용하기 위한 스레드 안전 래퍼.
-pub struct ConfigState {
-    pub config: Mutex<AppConfig>,
-    pub config_path: PathBuf,
+/// 실행 파일 옆 `config.json` 경로를 반환한다.
+/// 실행 파일 경로를 알 수 없으면 `./config.json`으로 폴백한다.
+pub fn resolve_config_path() -> PathBuf {
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            return exe_dir.join("config.json");
+        }
+    }
+    PathBuf::from("config.json")
 }
 
-impl ConfigState {
-    /// 실행 파일 옆 config.json을 읽어 상태를 생성한다.
-    pub fn new() -> Self {
-        let config_path = Self::resolve_config_path();
-        let config = Self::load_from_path(&config_path);
-        Self {
-            config: Mutex::new(config),
-            config_path,
-        }
-    }
-
-    /// 실행 파일 옆 `config.json` 경로를 반환한다.
-    /// 실행 파일 경로를 알 수 없으면 `./config.json`으로 폴백한다.
-    pub fn resolve_config_path() -> PathBuf {
-        if let Ok(exe_path) = std::env::current_exe() {
-            if let Some(exe_dir) = exe_path.parent() {
-                return exe_dir.join("config.json");
-            }
-        }
-        PathBuf::from("config.json")
-    }
-
-    /// 지정된 경로에서 설정을 불러온다. 파일이 없거나 파싱 실패 시 기본값을 반환한다.
-    fn load_from_path(path: &PathBuf) -> AppConfig {
-        if path.exists() {
-            match fs::read_to_string(path) {
-                Ok(content) => serde_json::from_str(&content).unwrap_or_default(),
-                Err(_) => AppConfig::default(),
-            }
-        } else {
-            AppConfig::default()
-        }
-    }
-
-    /// 현재 설정을 디스크에 저장한다.
-    pub fn save(&self) -> Result<(), String> {
-        let config = self.config.lock().map_err(|e| e.to_string())?;
-        let json =
-            serde_json::to_string_pretty(&*config).map_err(|e| e.to_string())?;
-        if let Some(parent) = self.config_path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|e| format!("Failed to create config dir: {e}"))?;
-        }
-        fs::write(&self.config_path, json)
-            .map_err(|e| format!("Failed to write config: {e}"))?;
-        Ok(())
-    }
-
-    /// `library_path`가 상대 경로일 때 실행 파일 디렉토리 기준으로 절대 경로로 변환한다.
-    pub fn resolved_library_path(library_path: &str) -> PathBuf {
-        let p = PathBuf::from(library_path);
-        if p.is_absolute() {
-            p
-        } else {
-            std::env::current_exe()
-                .ok()
-                .and_then(|exe| exe.parent().map(|d| d.to_path_buf()))
-                .unwrap_or_else(|| PathBuf::from("."))
-                .join(&p)
-        }
+/// `library_path`가 상대 경로일 때 실행 파일 디렉토리 기준으로 절대 경로로 변환한다.
+pub fn resolved_library_path(library_path: &str) -> PathBuf {
+    let p = PathBuf::from(library_path);
+    if p.is_absolute() {
+        p
+    } else {
+        std::env::current_exe()
+            .ok()
+            .and_then(|exe| exe.parent().map(|d| d.to_path_buf()))
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join(&p)
     }
 }
 
@@ -275,17 +230,15 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
         let path = dir.join("config.json");
 
-        let state = ConfigState {
-            config: Mutex::new(AppConfig {
-                library_path: "./custom/".to_string(),
-                download_quality: "1080".to_string(),
-                language: Language::En,
-                mp4_retention: true,
-                ..AppConfig::default()
-            }),
-            config_path: path.clone(),
+        let cfg = AppConfig {
+            library_path: "./custom/".to_string(),
+            download_quality: "1080".to_string(),
+            language: Language::En,
+            mp4_retention: true,
+            ..AppConfig::default()
         };
-        state.save().unwrap();
+        let json = serde_json::to_string_pretty(&cfg).unwrap();
+        fs::write(&path, json).unwrap();
 
         let content = fs::read_to_string(&path).unwrap();
         let loaded: AppConfig = serde_json::from_str(&content).unwrap();
@@ -298,7 +251,7 @@ mod tests {
 
     #[test]
     fn resolved_library_path_relative() {
-        let resolved = ConfigState::resolved_library_path("./library/");
+        let resolved = resolved_library_path("./library/");
         // Should be absolute (joined with exe dir or ".")
         assert!(resolved.is_absolute() || resolved.starts_with("."));
     }

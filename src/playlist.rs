@@ -5,7 +5,6 @@
 //! 영상 제목, ID, 재생 시간을 추출한다.
 
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 use std::process::Command;
 
 use crate::cmd_util::HideWindow;
@@ -121,11 +120,6 @@ fn extract_query_param(url: &str, param_name: &str) -> Option<String> {
 
 // ─── yt-dlp Playlist Fetching ───────────────────────────────────────
 
-/// tools_manager를 통해 yt-dlp 실행 파일 경로를 반환한다.
-fn resolve_ytdlp_path() -> PathBuf {
-    crate::tools_manager::resolve_ytdlp_path()
-}
-
 /// yt-dlp --flat-playlist --dump-json 출력의 원시 JSON 항목.
 /// 출력의 각 줄은 이 필드들을 가진 JSON 객체이다.
 #[derive(Debug, Deserialize)]
@@ -151,7 +145,7 @@ struct YtdlpFlatEntry {
 ///
 /// yt-dlp 실행 실패 또는 오류 반환 시 오류 문자열을 반환한다.
 pub fn fetch_playlist_entries(url: &str) -> Result<PlaylistResult, String> {
-    let ytdlp = resolve_ytdlp_path();
+    let ytdlp = crate::tools_manager::resolve_ytdlp_path();
 
     let output = Command::new(&ytdlp)
         .args([

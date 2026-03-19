@@ -382,62 +382,31 @@ pub async fn update_ytdlp(app: AppHandle) -> Result<(), String> {
 
 // ─── Path resolution helpers (used by metadata.rs / capture.rs) ──────────────
 
-/// yt-dlp 경로를 결정한다: tools/ → 실행 파일 옆 → 시스템 PATH 순으로 탐색.
-pub fn resolve_ytdlp_path() -> PathBuf {
+/// 도구 바이너리 경로를 결정한다: tools/ → 실행 파일 옆 → 시스템 PATH 순으로 탐색.
+///
+/// `name`은 확장자 없는 도구 이름 (예: "yt-dlp", "ffmpeg", "ffprobe").
+/// Windows에서는 자동으로 `.exe` 확장자를 추가한다.
+fn resolve_tool_binary(name: &str) -> PathBuf {
+    let exe_name = if cfg!(windows) { format!("{name}.exe") } else { name.to_string() };
+
     // 1. tools/ 디렉토리
-    let in_tools = tool_path("yt-dlp.exe");
+    let in_tools = tool_path(&exe_name);
     if in_tools.exists() {
         return in_tools;
     }
     // 2. 실행 파일 옆 (하위 호환 / 포터블)
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
-            let candidate = dir.join(if cfg!(windows) { "yt-dlp.exe" } else { "yt-dlp" });
+            let candidate = dir.join(&exe_name);
             if candidate.exists() {
                 return candidate;
             }
         }
     }
     // 3. 시스템 PATH
-    PathBuf::from(if cfg!(windows) { "yt-dlp.exe" } else { "yt-dlp" })
+    PathBuf::from(&exe_name)
 }
 
-/// ffmpeg 경로를 결정한다: tools/ → 실행 파일 옆 → 시스템 PATH 순으로 탐색.
-pub fn resolve_ffmpeg_path() -> PathBuf {
-    // 1. tools/ 디렉토리
-    let in_tools = tool_path("ffmpeg.exe");
-    if in_tools.exists() {
-        return in_tools;
-    }
-    // 2. 실행 파일 옆 (하위 호환 / 포터블)
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            let candidate = dir.join(if cfg!(windows) { "ffmpeg.exe" } else { "ffmpeg" });
-            if candidate.exists() {
-                return candidate;
-            }
-        }
-    }
-    // 3. 시스템 PATH
-    PathBuf::from("ffmpeg")
-}
-
-/// ffprobe 경로를 결정한다: tools/ → 실행 파일 옆 → 시스템 PATH 순으로 탐색.
-pub fn resolve_ffprobe_path() -> PathBuf {
-    // 1. tools/ 디렉토리
-    let in_tools = tool_path("ffprobe.exe");
-    if in_tools.exists() {
-        return in_tools;
-    }
-    // 2. 실행 파일 옆 (하위 호환 / 포터블)
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            let candidate = dir.join(if cfg!(windows) { "ffprobe.exe" } else { "ffprobe" });
-            if candidate.exists() {
-                return candidate;
-            }
-        }
-    }
-    // 3. 시스템 PATH
-    PathBuf::from("ffprobe")
-}
+pub fn resolve_ytdlp_path() -> PathBuf { resolve_tool_binary("yt-dlp") }
+pub fn resolve_ffmpeg_path() -> PathBuf { resolve_tool_binary("ffmpeg") }
+pub fn resolve_ffprobe_path() -> PathBuf { resolve_tool_binary("ffprobe") }

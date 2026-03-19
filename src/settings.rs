@@ -6,7 +6,7 @@
 
 pub use crate::config::{AppConfig, Language, VALID_CAPTURE_MODES, VALID_QUALITIES};
 
-use crate::config::ConfigState;
+use crate::config;
 use serde::Serialize;
 use std::sync::Mutex;
 
@@ -19,7 +19,7 @@ pub struct SettingsState(pub Mutex<Settings>);
 /// 실행 파일 옆 config.json에서 설정을 불러온다.
 /// 파일이 없으면 기본값을 반환한다.
 pub fn load_settings() -> Result<Settings, String> {
-    let path = ConfigState::resolve_config_path();
+    let path = config::resolve_config_path();
     if path.exists() {
         let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
         let settings: Settings = serde_json::from_str(&content).map_err(|e| e.to_string())?;
@@ -40,7 +40,7 @@ pub fn load_settings() -> Result<Settings, String> {
 
 /// 실행 파일 옆 config.json에 설정을 저장한다.
 pub fn save_settings(settings: &Settings) -> Result<(), String> {
-    let path = ConfigState::resolve_config_path();
+    let path = config::resolve_config_path();
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|e| format!("Failed to create config dir: {e}"))?;
@@ -177,7 +177,7 @@ pub fn validate_settings(
     let resolved_lib = settings.resolved_library_path();
     let library_exists = resolved_lib.exists();
 
-    let config_path = ConfigState::resolve_config_path();
+    let config_path = config::resolve_config_path();
 
     Ok(ValidationResult {
         valid: errors.is_empty() && ffmpeg_found && ytdlp_found,
@@ -206,7 +206,7 @@ pub fn reset_settings(
 /// 프론트엔드에서 설정 파일 위치를 표시할 때 사용한다.
 #[tauri::command]
 pub fn get_config_path() -> String {
-    ConfigState::resolve_config_path()
+    config::resolve_config_path()
         .to_string_lossy()
         .to_string()
 }

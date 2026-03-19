@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::cmd_util::HideWindow;
-use crate::metadata::resolve_ytdlp_path;
+use crate::tools_manager::resolve_ytdlp_path;
 
 /// 영상 다운로드 성공 결과.
 #[derive(Debug, Clone)]
