@@ -4,7 +4,6 @@
 //! 새 필드를 추가할 때는 `#[serde(default)]`를 붙여 이전 설정과의 하위 호환성을 유지한다.
 
 use serde::{Deserialize, Serialize};
-use std::fs;
 use std::path::PathBuf;
 
 /// UI 표시 언어.
@@ -170,6 +169,7 @@ pub fn resolved_library_path(library_path: &str) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     #[test]
     fn default_values() {
