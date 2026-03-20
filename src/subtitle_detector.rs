@@ -4,7 +4,6 @@
 //! 있는지 확인하고 결과를 프론트엔드에 반환한다.
 
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 use std::process::Command;
 
 use crate::cmd_util::HideWindow;
@@ -55,17 +54,12 @@ impl SubtitleCheckResult {
     }
 }
 
-/// tools_manager를 통해 yt-dlp 실행 파일 경로를 반환한다.
-pub fn resolve_ytdlp_path() -> PathBuf {
-    crate::tools_manager::resolve_ytdlp_path()
-}
-
 /// yt-dlp로 YouTube 영상의 자막 가용 여부를 확인한다.
 ///
 /// `yt-dlp --list-subs --skip-download <url>`을 실행하고 출력을 파싱해
 /// 사용 가능한 자막을 결정한다.
 pub fn check_subtitles(video_url: &str) -> SubtitleCheckResult {
-    let ytdlp_path = resolve_ytdlp_path();
+    let ytdlp_path = crate::tools_manager::resolve_ytdlp_path();
 
     let output = match Command::new(&ytdlp_path)
         .args(["--list-subs", "--skip-download", video_url])
@@ -374,7 +368,7 @@ ja              Japanese                 vtt, ttml, srv3, srv2, srv1, json3
     #[test]
     fn test_resolve_ytdlp_path_fallback() {
         // Should at least return a path (won't crash)
-        let path = resolve_ytdlp_path();
+        let path = crate::tools_manager::resolve_ytdlp_path();
         assert!(!path.to_string_lossy().is_empty());
     }
 

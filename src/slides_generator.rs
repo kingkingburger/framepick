@@ -197,17 +197,6 @@ pub fn generate_slides_html(
     Ok(())
 }
 
-/// `output_dir/segments.json`에서 세그먼트를 불러와 slides.html을 생성한다.
-pub fn generate_from_segments_json(
-    output_dir: &Path,
-    metadata: &VideoMetadata,
-) -> Result<(), GeneratorError> {
-    let seg_path = output_dir.join("segments.json");
-    let content = fs::read_to_string(&seg_path)?;
-    let segments: Vec<Segment> = serde_json::from_str(&content)?;
-    generate_slides_html(output_dir, &segments, metadata)
-}
-
 /// 슬라이드 뷰어용 전체 HTML 문자열을 렌더링한다.
 pub fn render_slides_html(
     segments: &[Segment],
@@ -971,38 +960,6 @@ body{{
     Ok(html)
 }
 
-/// slides.html과 함께 slides.md(마크다운 버전)를 생성한다.
-pub fn generate_slides_md(
-    output_dir: &Path,
-    segments: &[Segment],
-    metadata: &VideoMetadata,
-) -> Result<(), GeneratorError> {
-    let mut md = String::new();
-    writeln!(md, "---")?;
-    writeln!(md, "title: \"{}\"", metadata.title)?;
-    writeln!(md, "url: {}", metadata.url)?;
-    writeln!(md, "channel: {}", metadata.channel)?;
-    writeln!(md, "date: {}", metadata.date)?;
-    writeln!(md, "duration: {}", metadata.duration)?;
-    writeln!(md, "---")?;
-    writeln!(md)?;
-    writeln!(md, "# {}", metadata.title)?;
-    writeln!(md)?;
-
-    for seg in segments {
-        writeln!(md, "## [{}]", seg.timestamp)?;
-        writeln!(md)?;
-        writeln!(md, "![{}](images/{})", seg.timestamp, seg.image)?;
-        writeln!(md)?;
-        writeln!(md, "> {}", seg.text)?;
-        writeln!(md)?;
-    }
-
-    let md_path = output_dir.join("slides.md");
-    fs::write(&md_path, md)?;
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1135,16 +1092,11 @@ mod tests {
         let metadata = sample_metadata();
 
         generate_slides_html(&dir, &segments, &metadata).unwrap();
-        generate_slides_md(&dir, &segments, &metadata).unwrap();
 
         assert!(dir.join("slides.html").exists());
-        assert!(dir.join("slides.md").exists());
 
         let html = std::fs::read_to_string(dir.join("slides.html")).unwrap();
         assert!(html.contains("<!DOCTYPE html>"));
-
-        let md = std::fs::read_to_string(dir.join("slides.md")).unwrap();
-        assert!(md.contains("# Rust 소유권 완벽 가이드"));
 
         let _ = std::fs::remove_dir_all(&dir);
     }

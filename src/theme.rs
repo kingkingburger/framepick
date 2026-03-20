@@ -1,71 +1,8 @@
 //! framepick 공유 다크 테마 (글래스모피즘 + 민트 그린)
 //!
-//! 이 값들은 `frontend/css/theme.css`와 동기화되어야 한다.
-//! 생성되는 slides.html에 임베딩되어 Tauri 앱과 동일한 테마를 적용.
-
-// ── 배경 색상 ──
-
-pub const BG_BODY: &str = "#0f172a";
-pub const BG_SIDEBAR: &str = "rgba(15, 23, 42, 0.85)";
-pub const BG_SURFACE: &str = "rgba(30, 41, 59, 0.6)";
-pub const BG_CARD: &str = "rgba(15, 23, 42, 0.7)";
-pub const BG_INPUT: &str = "rgba(15, 23, 42, 0.8)";
-pub const BG_OVERLAY: &str = "rgba(0, 0, 0, 0.78)";
-pub const BG_OVERLAY_LIGHT: &str = "rgba(0, 0, 0, 0.6)";
-pub const BG_HOVER: &str = "rgba(30, 41, 59, 0.5)";
-pub const BG_ACTIVE: &str = "rgba(16, 185, 129, 0.1)";
-pub const BG_IMAGE: &str = "#000";
-pub const BG_SCROLLBAR_TRACK: &str = "transparent";
-pub const BG_SCROLLBAR_THUMB: &str = "rgba(148, 163, 184, 0.2)";
-pub const BG_SCROLLBAR_THUMB_HOVER: &str = "rgba(148, 163, 184, 0.35)";
-
-// ── 텍스트 색상 ──
-
-pub const TEXT_PRIMARY: &str = "#e2e8f0";
-pub const TEXT_SECONDARY: &str = "#94a3b8";
-pub const TEXT_HINT: &str = "#64748b";
-pub const TEXT_MUTED: &str = "#475569";
-pub const TEXT_HEADING: &str = "#f1f5f9";
-pub const TEXT_BODY: &str = "#cbd5e1";
-pub const TEXT_META: &str = "#64748b";
-pub const TEXT_FOOTER: &str = "#334155";
-
-// ── 액센트 색상 (민트 그린) ──
-
-pub const ACCENT: &str = "#10b981";
-pub const ACCENT_HOVER: &str = "#34d399";
-pub const ACCENT_LIGHT: &str = "#6ee7b7";
-pub const ACCENT_SUBTLE: &str = "rgba(16, 185, 129, 0.12)";
-
-// ── 테두리 색상 ──
-
-pub const BORDER: &str = "rgba(148, 163, 184, 0.12)";
-pub const BORDER_FOCUS: &str = "#10b981";
-pub const BORDER_SUBTLE: &str = "rgba(148, 163, 184, 0.06)";
-
-// ── 그림자 ──
-
-pub const SHADOW: &str = "rgba(0, 0, 0, 0.3)";
-pub const SHADOW_CARD: &str = "0 4px 16px rgba(0, 0, 0, 0.25)";
-pub const SHADOW_CARD_HOVER: &str = "0 8px 32px rgba(16, 185, 129, 0.15)";
-pub const SHADOW_TOGGLE: &str = "0 2px 12px rgba(16, 185, 129, 0.4)";
-
-// ── 테두리 반경 ──
-
-pub const RADIUS: &str = "12px";
-pub const RADIUS_SM: &str = "6px";
-pub const RADIUS_LG: &str = "16px";
-
-// ── 타이포그래피 ──
-
-pub const FONT_FAMILY: &str =
-    "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif";
-pub const FONT_MONO: &str = "'JetBrains Mono', 'Fira Code', 'Consolas', monospace";
-
-// ── 전환 ──
-
-pub const TRANSITION: &str = "0.2s ease";
-pub const TRANSITION_FAST: &str = "0.15s ease";
+//! `css_variables_block()`이 반환하는 CSS 커스텀 프로퍼티 블록을
+//! slides.html 등 독립 HTML 파일에 임베딩하여 Tauri 앱과 동일한 테마를 적용한다.
+//! 값은 반드시 `frontend/css/theme.css`와 일치해야 함.
 
 /// CSS `:root` 블록을 반환한다. `--fp-*` 커스텀 프로퍼티 포함.
 ///
@@ -218,17 +155,6 @@ mod tests {
         // Glassmorphism tokens
         assert!(css.contains("--fp-glass-bg:"));
         assert!(css.contains("--fp-glass-blur:"));
-    }
-
-    #[test]
-    fn constants_match_css_variables_block() {
-        let css = css_variables_block();
-        assert!(css.contains(BG_BODY));
-        assert!(css.contains(TEXT_PRIMARY));
-        assert!(css.contains(ACCENT));
-        assert!(css.contains(BORDER_FOCUS));
-        assert!(css.contains(RADIUS));
-        assert!(css.contains(FONT_MONO));
     }
 
     #[test]

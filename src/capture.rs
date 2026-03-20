@@ -97,26 +97,6 @@ impl From<std::io::Error> for CaptureError {
     }
 }
 
-/// ffmpeg 바이너리 경로를 결정한다.
-///
-/// 탐색 순서:
-/// 1. 실행 파일 옆 `tools/ffmpeg.exe` (tools_manager가 관리).
-/// 2. 실행 파일 바로 옆 `ffmpeg.exe` (포터블/레거시).
-/// 3. 시스템 PATH (폴백).
-pub fn resolve_ffmpeg_path() -> PathBuf {
-    crate::tools_manager::resolve_ffmpeg_path()
-}
-
-/// ffprobe 경로를 결정한다 (영상 길이 조회에 사용).
-///
-/// 탐색 순서:
-/// 1. 실행 파일 옆 `tools/ffprobe.exe` (tools_manager가 관리).
-/// 2. 실행 파일 바로 옆 `ffprobe.exe` (포터블/레거시).
-/// 3. 시스템 PATH (폴백).
-pub fn resolve_ffprobe_path() -> PathBuf {
-    crate::tools_manager::resolve_ffprobe_path()
-}
-
 /// 초를 "HH:MM:SS" 표시 문자열로 변환한다.
 pub fn format_timestamp(secs: f64) -> String {
     let total = secs.round() as u64;
@@ -151,7 +131,7 @@ pub fn capture_scene_change(
     output_dir: &Path,
     threshold: f64,
 ) -> Result<Vec<CapturedFrame>, CaptureError> {
-    let ffmpeg = resolve_ffmpeg_path();
+    let ffmpeg = crate::tools_manager::resolve_ffmpeg_path();
     let images_dir = output_dir.join("images");
     std::fs::create_dir_all(&images_dir)?;
 
@@ -313,7 +293,7 @@ pub fn capture_interval(
     interval_secs: u32,
     duration_secs: Option<f64>,
 ) -> Result<Vec<CapturedFrame>, CaptureError> {
-    let ffmpeg = resolve_ffmpeg_path();
+    let ffmpeg = crate::tools_manager::resolve_ffmpeg_path();
     let images_dir = output_dir.join("images");
     std::fs::create_dir_all(&images_dir)?;
 
@@ -350,7 +330,7 @@ pub fn capture_interval(
 
 /// ffprobe로 영상 길이(초)를 조회한다.
 fn probe_duration(video_path: &Path) -> Result<f64, CaptureError> {
-    let ffprobe = resolve_ffprobe_path();
+    let ffprobe = crate::tools_manager::resolve_ffprobe_path();
 
     let output = Command::new(&ffprobe)
         .args([
@@ -465,95 +445,7 @@ pub fn capture_subtitle(
     }
 }
 
-/// Search for subtitle files (`.vtt`, `.srt`) alongside the video and parse cue timestamps.
-///
-/// Returns `None` if no subtitle files are found.
-/// Returns `Some(vec![])` if files are found but contain no valid cues.
-/// Returns `Some(timestamps)` with deduplicated, sorted cue start times in seconds.
-#[cfg(test)]
-fn find_and_parse_subtitles(video_path: &Path) -> Option<Vec<f64>> {
-    let video_dir = video_path.parent()?;
-    let video_stem = video_path.file_stem()?.to_str()?;
-
-    // Look for subtitle files matching the video name or any subtitle file in the directory
-    let mut subtitle_files: Vec<PathBuf> = Vec::new();
-
-    if let Ok(entries) = std::fs::read_dir(video_dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                let ext_lower = ext.to_lowercase();
-                if ext_lower == "vtt" || ext_lower == "srt" || ext_lower == "json3" {
-                    // Prefer files matching the video stem, but collect all
-                    subtitle_files.push(path);
-                }
-            }
-        }
-    }
-
-    if subtitle_files.is_empty() {
-        return None;
-    }
-
-    // Sort: prioritize by (1) video stem match, (2) Korean language, (3) English language.
-    // This ensures Korean subtitles are tried first, then English, matching the
-    // LANGUAGE_PRIORITY in subtitle_extractor.rs (ko > en > other).
-    subtitle_files.sort_by(|a, b| {
-        let a_name = a.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-        let b_name = b.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-
-        let a_matches_stem = a_name.starts_with(video_stem);
-        let b_matches_stem = b_name.starts_with(video_stem);
-
-        // Primary sort: files matching the video stem first
-        let stem_cmp = b_matches_stem.cmp(&a_matches_stem);
-        if stem_cmp != std::cmp::Ordering::Equal {
-            return stem_cmp;
-        }
-
-        // Secondary sort: language priority (ko > en > other)
-        let lang_priority = |name: &str| -> u8 {
-            let lower = name.to_lowercase();
-            if lower.contains(".ko") || lower.contains("_ko") || lower.contains("-ko") {
-                0 // Korean: highest priority
-            } else if lower.contains(".en") || lower.contains("_en") || lower.contains("-en") {
-                1 // English: second priority
-            } else {
-                2 // Other languages
-            }
-        };
-        lang_priority(a_name).cmp(&lang_priority(b_name))
-    });
-
-    // Try parsing each subtitle file until we get valid timestamps
-    for sub_path in &subtitle_files {
-        if let Ok(content) = std::fs::read_to_string(sub_path) {
-            let ext = sub_path
-                .extension()
-                .and_then(|e| e.to_str())
-                .unwrap_or("")
-                .to_lowercase();
-            let timestamps = match ext.as_str() {
-                "vtt" => parse_vtt_timestamps(&content),
-                "srt" => parse_srt_timestamps(&content),
-                "json3" => parse_json3_timestamps(&content),
-                _ => continue,
-            };
-            if !timestamps.is_empty() {
-                return Some(timestamps);
-            }
-        }
-    }
-
-    // Files found but no valid cues parsed from any of them
-    Some(Vec::new())
-}
-
 /// 영상 옆의 자막 파일을 탐색해 텍스트가 포함된 자막 큐로 파싱한다.
-///
-/// `find_and_parse_subtitles`와 유사하지만 타임스탬프뿐 아니라
-/// 자막 텍스트도 포함한 `SubtitleCue` 객체를 반환한다.
-/// 슬라이드 뷰어에서 프레임에 자막 텍스트를 연결하는 데 필요하다.
 ///
 /// 자막 파일 없으면 `None`, 파일은 있지만 유효한 큐가 없으면 `Some(vec![])`,
 /// 성공 시 텍스트 포함 큐 `Some(cues)`를 반환한다.
@@ -639,122 +531,6 @@ fn find_and_parse_subtitle_cues(
     Some(Vec::new())
 }
 
-/// WebVTT(.vtt) 자막 파일에서 큐 시작 타임스탬프를 파싱한다.
-///
-/// VTT 형식:
-/// ```text
-/// WEBVTT
-///
-/// 00:00:01.000 --> 00:00:04.000
-/// First subtitle text
-///
-/// 00:00:05.500 --> 00:00:08.000
-/// Second subtitle text
-/// ```
-///
-/// 중복 제거 후 초 단위로 정렬된 타임스탬프를 반환한다.
-pub fn parse_vtt_timestamps(content: &str) -> Vec<f64> {
-    let mut timestamps: Vec<f64> = Vec::new();
-
-    for line in content.lines() {
-        let trimmed = line.trim();
-        // Match lines containing " --> " (the cue timing line)
-        if let Some(arrow_pos) = trimmed.find(" --> ") {
-            let start_str = &trimmed[..arrow_pos].trim();
-            if let Some(secs) = parse_subtitle_timestamp(start_str) {
-                // Deduplicate: skip if within 1.0s of previous timestamp
-                if timestamps
-                    .last()
-                    .map_or(true, |&prev| (secs - prev).abs() > 1.0)
-                {
-                    timestamps.push(secs);
-                }
-            }
-        }
-    }
-
-    timestamps.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    timestamps
-}
-
-/// SRT(.srt) 자막 파일에서 큐 시작 타임스탬프를 파싱한다.
-///
-/// SRT 형식:
-/// ```text
-/// 1
-/// 00:00:01,000 --> 00:00:04,000
-/// First subtitle text
-///
-/// 2
-/// 00:00:05,500 --> 00:00:08,000
-/// Second subtitle text
-/// ```
-///
-/// 중복 제거 후 초 단위로 정렬된 타임스탬프를 반환한다.
-pub fn parse_srt_timestamps(content: &str) -> Vec<f64> {
-    let mut timestamps: Vec<f64> = Vec::new();
-
-    for line in content.lines() {
-        let trimmed = line.trim();
-        // SRT uses comma for millisecond separator; normalize to period
-        if let Some(arrow_pos) = trimmed.find(" --> ") {
-            let start_str = trimmed[..arrow_pos].trim().replace(',', ".");
-            if let Some(secs) = parse_subtitle_timestamp(&start_str) {
-                // Deduplicate: skip if within 1.0s of previous timestamp
-                if timestamps
-                    .last()
-                    .map_or(true, |&prev| (secs - prev).abs() > 1.0)
-                {
-                    timestamps.push(secs);
-                }
-            }
-        }
-    }
-
-    timestamps.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    timestamps
-}
-
-/// YouTube json3 자막 파일에서 큐 시작 타임스탬프를 파싱한다.
-///
-/// json3 형식 (yt-dlp로 다운로드된 것):
-/// ```json
-/// {"events":[{"tStartMs":0,"dDurationMs":5000,"segs":[{"utf8":"Hello"}]}, ...]}
-/// ```
-///
-/// 중복 제거 후 초 단위로 정렬된 타임스탬프를 반환한다.
-pub fn parse_json3_timestamps(content: &str) -> Vec<f64> {
-    let mut timestamps: Vec<f64> = Vec::new();
-
-    let Ok(root) = serde_json::from_str::<serde_json::Value>(content) else {
-        return timestamps;
-    };
-
-    let Some(events) = root.get("events").and_then(|e| e.as_array()) else {
-        return timestamps;
-    };
-
-    for event in events {
-        // Skip events without segments (header/metadata events)
-        if event.get("segs").is_none() {
-            continue;
-        }
-        if let Some(start_ms) = event.get("tStartMs").and_then(|v| v.as_f64()) {
-            let secs = start_ms / 1000.0;
-            // Deduplicate: skip if within 1.0s of previous timestamp
-            if timestamps
-                .last()
-                .map_or(true, |&prev| (secs - prev).abs() > 1.0)
-            {
-                timestamps.push(secs);
-            }
-        }
-    }
-
-    timestamps.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    timestamps
-}
-
 /// YouTube json3 자막 파일을 텍스트가 포함된 자막 큐로 파싱한다.
 ///
 /// json3 형식 (yt-dlp로 다운로드된 것):
@@ -808,32 +584,6 @@ fn parse_json3_cues(content: &str) -> Result<Vec<crate::subtitle_extractor::Subt
     Ok(cues)
 }
 
-/// 자막 타임스탬프 문자열을 초로 변환한다.
-///
-/// 지원 형식:
-/// - `HH:MM:SS.mmm` (예: "00:01:23.456")
-/// - `MM:SS.mmm` (예: "01:23.456")
-/// - `HH:MM:SS,mmm` (SRT 형식, 쉼표는 호출자가 미리 변환해야 함)
-fn parse_subtitle_timestamp(ts: &str) -> Option<f64> {
-    let parts: Vec<&str> = ts.split(':').collect();
-    match parts.len() {
-        3 => {
-            // HH:MM:SS.mmm
-            let hours: f64 = parts[0].parse().ok()?;
-            let minutes: f64 = parts[1].parse().ok()?;
-            let seconds: f64 = parts[2].parse().ok()?;
-            Some(hours * 3600.0 + minutes * 60.0 + seconds)
-        }
-        2 => {
-            // MM:SS.mmm
-            let minutes: f64 = parts[0].parse().ok()?;
-            let seconds: f64 = parts[1].parse().ok()?;
-            Some(minutes * 60.0 + seconds)
-        }
-        _ => None,
-    }
-}
-
 /// 영상의 지정된 타임스탬프 목록에서 프레임을 캡쳐한다.
 ///
 /// 자막 기반 캡쳐에서 큐 시작 시간에 프레임을 추출할 때 사용된다.
@@ -842,7 +592,7 @@ fn capture_at_timestamps(
     output_dir: &Path,
     timestamps: &[f64],
 ) -> Result<Vec<CapturedFrame>, CaptureError> {
-    let ffmpeg = resolve_ffmpeg_path();
+    let ffmpeg = crate::tools_manager::resolve_ffmpeg_path();
     let images_dir = output_dir.join("images");
     std::fs::create_dir_all(&images_dir)?;
 
@@ -1038,7 +788,7 @@ mod tests {
     #[test]
     fn test_resolve_ffmpeg_path_fallback() {
         // Should at least return "ffmpeg" as fallback
-        let path = resolve_ffmpeg_path();
+        let path = crate::tools_manager::resolve_ffmpeg_path();
         let name = path.file_name().unwrap().to_str().unwrap();
         assert!(
             name == "ffmpeg" || name == "ffmpeg.exe",
@@ -1049,7 +799,7 @@ mod tests {
 
     #[test]
     fn test_resolve_ffprobe_path_fallback() {
-        let path = resolve_ffprobe_path();
+        let path = crate::tools_manager::resolve_ffprobe_path();
         let name = path.file_name().unwrap().to_str().unwrap();
         assert!(
             name == "ffprobe" || name == "ffprobe.exe",
@@ -1108,152 +858,6 @@ frame=   75 fps=24 q=-0.0 size=N/A time=00:00:03.12 bitrate=N/A speed=3.5x
         assert!((timestamps[0] - 0.0).abs() < 0.001);
         assert!((timestamps[1] - 3.003).abs() < 0.001);
         assert!((timestamps[2] - 15.015).abs() < 0.001);
-    }
-
-    // ─── Subtitle Parsing Tests ──────────────────────────────────
-
-    #[test]
-    fn test_parse_subtitle_timestamp_hhmmss() {
-        assert_eq!(parse_subtitle_timestamp("00:00:00.000"), Some(0.0));
-        assert_eq!(parse_subtitle_timestamp("00:01:23.456"), Some(83.456));
-        assert_eq!(parse_subtitle_timestamp("01:00:00.000"), Some(3600.0));
-        assert_eq!(parse_subtitle_timestamp("01:30:45.500"), Some(5445.5));
-    }
-
-    #[test]
-    fn test_parse_subtitle_timestamp_mmss() {
-        assert_eq!(parse_subtitle_timestamp("01:23.456"), Some(83.456));
-        assert_eq!(parse_subtitle_timestamp("00:05.000"), Some(5.0));
-    }
-
-    #[test]
-    fn test_parse_subtitle_timestamp_invalid() {
-        assert_eq!(parse_subtitle_timestamp(""), None);
-        assert_eq!(parse_subtitle_timestamp("abc"), None);
-        assert_eq!(parse_subtitle_timestamp("1:2:3:4"), None);
-    }
-
-    #[test]
-    fn test_parse_vtt_timestamps_basic() {
-        let vtt = "\
-WEBVTT
-
-00:00:01.000 --> 00:00:04.000
-Hello world
-
-00:00:05.500 --> 00:00:08.000
-Second cue
-
-00:00:15.000 --> 00:00:18.000
-Third cue
-";
-        let timestamps = parse_vtt_timestamps(vtt);
-        assert_eq!(timestamps.len(), 3);
-        assert!((timestamps[0] - 1.0).abs() < 0.001);
-        assert!((timestamps[1] - 5.5).abs() < 0.001);
-        assert!((timestamps[2] - 15.0).abs() < 0.001);
-    }
-
-    #[test]
-    fn test_parse_vtt_timestamps_deduplication() {
-        // Cues within 1.0s of each other should be deduplicated
-        let vtt = "\
-WEBVTT
-
-00:00:01.000 --> 00:00:02.000
-First
-
-00:00:01.500 --> 00:00:02.500
-Too close to first
-
-00:00:10.000 --> 00:00:12.000
-Far enough
-";
-        let timestamps = parse_vtt_timestamps(vtt);
-        assert_eq!(timestamps.len(), 2);
-        assert!((timestamps[0] - 1.0).abs() < 0.001);
-        assert!((timestamps[1] - 10.0).abs() < 0.001);
-    }
-
-    #[test]
-    fn test_parse_vtt_timestamps_empty() {
-        let vtt = "WEBVTT\n\n";
-        let timestamps = parse_vtt_timestamps(vtt);
-        assert!(timestamps.is_empty());
-    }
-
-    #[test]
-    fn test_parse_srt_timestamps_basic() {
-        let srt = "\
-1
-00:00:01,000 --> 00:00:04,000
-Hello world
-
-2
-00:00:05,500 --> 00:00:08,000
-Second cue
-
-3
-00:01:00,000 --> 00:01:05,000
-Third cue
-";
-        let timestamps = parse_srt_timestamps(srt);
-        assert_eq!(timestamps.len(), 3);
-        assert!((timestamps[0] - 1.0).abs() < 0.001);
-        assert!((timestamps[1] - 5.5).abs() < 0.001);
-        assert!((timestamps[2] - 60.0).abs() < 0.001);
-    }
-
-    #[test]
-    fn test_parse_srt_timestamps_deduplication() {
-        let srt = "\
-1
-00:00:01,000 --> 00:00:02,000
-First
-
-2
-00:00:01,800 --> 00:00:02,500
-Too close
-
-3
-00:00:10,000 --> 00:00:12,000
-Far enough
-";
-        let timestamps = parse_srt_timestamps(srt);
-        assert_eq!(timestamps.len(), 2);
-        assert!((timestamps[0] - 1.0).abs() < 0.001);
-        assert!((timestamps[1] - 10.0).abs() < 0.001);
-    }
-
-    #[test]
-    fn test_parse_srt_timestamps_empty() {
-        let timestamps = parse_srt_timestamps("");
-        assert!(timestamps.is_empty());
-    }
-
-    #[test]
-    fn test_parse_vtt_with_style_header() {
-        // VTT files can have STYLE and NOTE blocks before cues
-        let vtt = "\
-WEBVTT
-
-STYLE
-::cue {
-  color: white;
-}
-
-NOTE This is a comment
-
-00:00:05.000 --> 00:00:10.000
-First real cue
-
-00:00:20.000 --> 00:00:25.000
-Second cue
-";
-        let timestamps = parse_vtt_timestamps(vtt);
-        assert_eq!(timestamps.len(), 2);
-        assert!((timestamps[0] - 5.0).abs() < 0.001);
-        assert!((timestamps[1] - 20.0).abs() < 0.001);
     }
 
     #[test]
@@ -1317,17 +921,13 @@ Second cue
     }
 
     #[test]
-    fn test_find_subtitles_no_directory() {
-        // A video path with no parent dir should return None
-        let result = find_and_parse_subtitles(Path::new("nonexistent_video.mp4"));
-        // The parent exists (current dir), but no subtitle files should be found
-        // in the test environment, so None is expected
+    fn test_find_subtitle_cues_no_directory() {
+        let result = find_and_parse_subtitle_cues(Path::new("nonexistent_video.mp4"));
         assert!(result.is_none() || result.as_ref().map_or(false, |v| v.is_empty()));
     }
 
     #[test]
-    fn test_find_subtitles_with_temp_dir() {
-        // Create a temp directory with a VTT file to test file discovery
+    fn test_find_subtitle_cues_with_temp_dir() {
         let temp_dir = std::env::temp_dir().join("framepick_test_subtitles");
         let _ = std::fs::create_dir_all(&temp_dir);
 
@@ -1335,188 +935,113 @@ Second cue
         std::fs::write(&video_path, b"fake video").unwrap();
 
         let vtt_path = temp_dir.join("test_video.en.vtt");
-        let vtt_content = "\
-WEBVTT
+        std::fs::write(&vtt_path, "WEBVTT\n\n00:00:03.000 --> 00:00:06.000\nHello\n\n00:00:10.000 --> 00:00:14.000\nWorld\n").unwrap();
 
-00:00:03.000 --> 00:00:06.000
-Hello
-
-00:00:10.000 --> 00:00:14.000
-World
-";
-        std::fs::write(&vtt_path, vtt_content).unwrap();
-
-        let result = find_and_parse_subtitles(&video_path);
+        let result = find_and_parse_subtitle_cues(&video_path);
         assert!(result.is_some());
-        let timestamps = result.unwrap();
-        assert_eq!(timestamps.len(), 2);
-        assert!((timestamps[0] - 3.0).abs() < 0.001);
-        assert!((timestamps[1] - 10.0).abs() < 0.001);
+        let cues = result.unwrap();
+        assert_eq!(cues.len(), 2);
+        assert!((cues[0].start_secs - 3.0).abs() < 0.001);
+        assert!((cues[1].start_secs - 10.0).abs() < 0.001);
 
-        // Cleanup
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
 
     #[test]
-    fn test_find_subtitles_srt_format() {
+    fn test_find_subtitle_cues_srt_format() {
         let temp_dir = std::env::temp_dir().join("framepick_test_srt");
         let _ = std::fs::create_dir_all(&temp_dir);
 
         let video_path = temp_dir.join("my_video.mp4");
         std::fs::write(&video_path, b"fake video").unwrap();
 
-        let srt_path = temp_dir.join("my_video.ko.srt");
-        let srt_content = "\
-1
-00:00:02,000 --> 00:00:05,000
-안녕하세요
+        std::fs::write(temp_dir.join("my_video.ko.srt"), "1\n00:00:02,000 --> 00:00:05,000\n안녕하세요\n\n2\n00:00:08,500 --> 00:00:12,000\n자막 테스트\n").unwrap();
 
-2
-00:00:08,500 --> 00:00:12,000
-자막 테스트
-";
-        std::fs::write(&srt_path, srt_content).unwrap();
-
-        let result = find_and_parse_subtitles(&video_path);
+        let result = find_and_parse_subtitle_cues(&video_path);
         assert!(result.is_some());
-        let timestamps = result.unwrap();
-        assert_eq!(timestamps.len(), 2);
-        assert!((timestamps[0] - 2.0).abs() < 0.001);
-        assert!((timestamps[1] - 8.5).abs() < 0.001);
+        let cues = result.unwrap();
+        assert_eq!(cues.len(), 2);
+        assert!((cues[0].start_secs - 2.0).abs() < 0.001);
+        assert_eq!(cues[0].text, "안녕하세요");
+        assert!((cues[1].start_secs - 8.5).abs() < 0.001);
 
-        // Cleanup
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
 
     #[test]
-    fn test_find_subtitles_empty_subtitle_file() {
+    fn test_find_subtitle_cues_empty_subtitle_file() {
         let temp_dir = std::env::temp_dir().join("framepick_test_empty_sub");
         let _ = std::fs::create_dir_all(&temp_dir);
 
         let video_path = temp_dir.join("video.mp4");
         std::fs::write(&video_path, b"fake video").unwrap();
+        std::fs::write(temp_dir.join("video.vtt"), "WEBVTT\n\n").unwrap();
 
-        // Write an empty VTT file
-        let vtt_path = temp_dir.join("video.vtt");
-        std::fs::write(&vtt_path, "WEBVTT\n\n").unwrap();
-
-        let result = find_and_parse_subtitles(&video_path);
-        // Should return Some(empty vec) — file found but no cues
+        let result = find_and_parse_subtitle_cues(&video_path);
         assert!(result.is_some());
         assert!(result.unwrap().is_empty());
 
-        // Cleanup
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
 
     #[test]
-    fn test_find_subtitles_prioritizes_korean_over_english() {
-        // When both Korean and English subtitle files exist, Korean should be used first
+    fn test_find_subtitle_cues_prioritizes_korean_over_english() {
         let temp_dir = std::env::temp_dir().join("framepick_test_ko_priority");
         let _ = std::fs::remove_dir_all(&temp_dir);
         std::fs::create_dir_all(&temp_dir).unwrap();
 
         let video_path = temp_dir.join("video.mp4");
         std::fs::write(&video_path, b"fake video").unwrap();
+        std::fs::write(temp_dir.join("video.en.srt"), "1\n00:00:10,000 --> 00:00:15,000\nEnglish subtitle\n").unwrap();
+        std::fs::write(temp_dir.join("video.ko.srt"), "1\n00:00:02,000 --> 00:00:05,000\n한국어 자막\n\n2\n00:00:20,000 --> 00:00:25,000\n두 번째 자막\n").unwrap();
 
-        // English subtitle file with different timestamps
-        let en_srt = temp_dir.join("video.en.srt");
-        std::fs::write(&en_srt, "\
-1
-00:00:10,000 --> 00:00:15,000
-English subtitle
-").unwrap();
-
-        // Korean subtitle file — should be prioritized
-        let ko_srt = temp_dir.join("video.ko.srt");
-        std::fs::write(&ko_srt, "\
-1
-00:00:02,000 --> 00:00:05,000
-한국어 자막
-
-2
-00:00:20,000 --> 00:00:25,000
-두 번째 자막
-").unwrap();
-
-        let result = find_and_parse_subtitles(&video_path);
+        let result = find_and_parse_subtitle_cues(&video_path);
         assert!(result.is_some());
-        let timestamps = result.unwrap();
-        // Should use Korean timestamps (2.0 and 20.0), not English (10.0)
-        assert_eq!(timestamps.len(), 2);
-        assert!((timestamps[0] - 2.0).abs() < 0.001, "First timestamp should be 2.0 (Korean), got {}", timestamps[0]);
-        assert!((timestamps[1] - 20.0).abs() < 0.001, "Second timestamp should be 20.0 (Korean), got {}", timestamps[1]);
+        let cues = result.unwrap();
+        assert_eq!(cues.len(), 2);
+        assert!((cues[0].start_secs - 2.0).abs() < 0.001, "First should be 2.0 (Korean), got {}", cues[0].start_secs);
+        assert!((cues[1].start_secs - 20.0).abs() < 0.001, "Second should be 20.0 (Korean), got {}", cues[1].start_secs);
 
-        // Cleanup
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
 
     #[test]
-    fn test_find_subtitles_falls_back_to_english() {
-        // When only English subtitles exist (no Korean), English should be used
+    fn test_find_subtitle_cues_falls_back_to_english() {
         let temp_dir = std::env::temp_dir().join("framepick_test_en_fallback");
         let _ = std::fs::remove_dir_all(&temp_dir);
         std::fs::create_dir_all(&temp_dir).unwrap();
 
         let video_path = temp_dir.join("video.mp4");
         std::fs::write(&video_path, b"fake video").unwrap();
+        std::fs::write(temp_dir.join("video.en.srt"), "1\n00:00:05,000 --> 00:00:08,000\nEnglish only\n\n2\n00:00:15,000 --> 00:00:18,000\nSecond English cue\n").unwrap();
 
-        let en_srt = temp_dir.join("video.en.srt");
-        std::fs::write(&en_srt, "\
-1
-00:00:05,000 --> 00:00:08,000
-English only
-
-2
-00:00:15,000 --> 00:00:18,000
-Second English cue
-").unwrap();
-
-        let result = find_and_parse_subtitles(&video_path);
+        let result = find_and_parse_subtitle_cues(&video_path);
         assert!(result.is_some());
-        let timestamps = result.unwrap();
-        assert_eq!(timestamps.len(), 2);
-        assert!((timestamps[0] - 5.0).abs() < 0.001);
-        assert!((timestamps[1] - 15.0).abs() < 0.001);
+        let cues = result.unwrap();
+        assert_eq!(cues.len(), 2);
+        assert!((cues[0].start_secs - 5.0).abs() < 0.001);
+        assert!((cues[1].start_secs - 15.0).abs() < 0.001);
 
-        // Cleanup
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
 
     #[test]
-    fn test_find_subtitles_english_before_other_languages() {
-        // English should be prioritized over other non-Korean languages
+    fn test_find_subtitle_cues_english_before_other_languages() {
         let temp_dir = std::env::temp_dir().join("framepick_test_en_over_other");
         let _ = std::fs::remove_dir_all(&temp_dir);
         std::fs::create_dir_all(&temp_dir).unwrap();
 
         let video_path = temp_dir.join("video.mp4");
         std::fs::write(&video_path, b"fake video").unwrap();
+        std::fs::write(temp_dir.join("video.ja.srt"), "1\n00:00:30,000 --> 00:00:35,000\n日本語字幕\n").unwrap();
+        std::fs::write(temp_dir.join("video.en.srt"), "1\n00:00:07,000 --> 00:00:12,000\nEnglish subtitle\n").unwrap();
 
-        // Japanese subtitle file
-        let ja_srt = temp_dir.join("video.ja.srt");
-        std::fs::write(&ja_srt, "\
-1
-00:00:30,000 --> 00:00:35,000
-日本語字幕
-").unwrap();
-
-        // English subtitle file — should be prioritized over Japanese
-        let en_srt = temp_dir.join("video.en.srt");
-        std::fs::write(&en_srt, "\
-1
-00:00:07,000 --> 00:00:12,000
-English subtitle
-").unwrap();
-
-        let result = find_and_parse_subtitles(&video_path);
+        let result = find_and_parse_subtitle_cues(&video_path);
         assert!(result.is_some());
-        let timestamps = result.unwrap();
-        assert_eq!(timestamps.len(), 1);
-        // English (7.0) should be used before Japanese (30.0)
-        assert!((timestamps[0] - 7.0).abs() < 0.001, "Should use English subtitle timestamp 7.0, got {}", timestamps[0]);
+        let cues = result.unwrap();
+        assert_eq!(cues.len(), 1);
+        assert!((cues[0].start_secs - 7.0).abs() < 0.001, "Should use English 7.0, got {}", cues[0].start_secs);
 
-        // Cleanup
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
 

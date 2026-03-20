@@ -13,7 +13,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::cmd_util::HideWindow;
-use crate::subtitle_detector::{resolve_ytdlp_path, SubtitleCheckResult};
+use crate::subtitle_detector::SubtitleCheckResult;
+use crate::tools_manager::resolve_ytdlp_path;
 
 /// 기본 언어 우선순위: 한국어 우선, 그 다음 영어.
 pub const LANGUAGE_PRIORITY: &[&str] = &["ko", "en"];

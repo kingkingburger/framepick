@@ -175,16 +175,6 @@ impl ProgressTracker {
         let _ = app.emit("pipeline:progress", &payload);
     }
 
-    /// 오류 이벤트를 발행한다.
-    pub fn emit_error(&self, app: &AppHandle, message: &str) {
-        let payload = ErrorPayload {
-            queue_id: self.queue_id,
-            stage: self.current_stage(),
-            message: message.to_string(),
-        };
-        let _ = app.emit("pipeline:error", &payload);
-    }
-
     /// 현재 진행 페이로드를 큐 항목의 상태 필드에 동기화해
     /// `get_queue`가 최신 파이프라인 단계 정보를 반환하도록 한다.
     fn sync_to_queue(&self, app: &AppHandle, payload: &ProgressPayload) {

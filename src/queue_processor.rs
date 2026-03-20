@@ -8,7 +8,7 @@
 
 use crate::capture;
 use crate::cleanup;
-use crate::config::ConfigState;
+use crate::config;
 use crate::downloader;
 use crate::input_state::{PipelineState, QueueItem};
 use crate::metadata;
@@ -248,7 +248,7 @@ async fn process_single_item(
                 .map(|s| s.library_path.clone())
                 .unwrap_or_else(|_| "./library/".to_string())
         };
-        let video_dir = ConfigState::resolved_library_path(&library_path).join(&video_id);
+        let video_dir = config::resolved_library_path(&library_path).join(&video_id);
         if video_dir.exists() && video_dir.is_dir() {
             // Emit a duplicate-skipped event so the frontend can show a notification
             let _ = app.emit("queue:duplicate-skipped", serde_json::json!({
@@ -302,7 +302,7 @@ async fn process_single_item(
         )
     };
 
-    let video_dir = ConfigState::resolved_library_path(&library_path).join(&video_id);
+    let video_dir = config::resolved_library_path(&library_path).join(&video_id);
     std::fs::create_dir_all(&video_dir)
         .map_err(|e| format!("Failed to create video directory: {e}"))?;
 
